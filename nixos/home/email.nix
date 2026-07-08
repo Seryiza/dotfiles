@@ -73,7 +73,9 @@ in {
     };
   };
 
-  # Run OfflineIMAP every 5 minutes as a user service.
+  # Run OfflineIMAP every 5 minutes as a timer-only user service. Do not
+  # install the service into default.target; user activation waits for default
+  # target jobs to settle, so a stuck mail sync can block nixos-rebuild switch.
   systemd.user.services.offlineimap-sync = {
     Unit.Description = "OfflineIMAP sync";
     Service = {
@@ -81,8 +83,11 @@ in {
       ExecStart = bins.offlineimap;
       Environment =
         "PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.mu pkgs.offlineimap ]}";
+      TimeoutStartSec = "5m";
+      TimeoutStopSec = "1m";
+      KillMode = "control-group";
+      KillSignal = "SIGINT";
     };
-    Install.WantedBy = [ "default.target" ];
   };
 
   systemd.user.timers.offlineimap-sync = {
