@@ -10,6 +10,7 @@ in {
     ./home/waybar.nix
     ./home/email.nix
     ./home/xremap.nix
+    ./home/emacs.nix
   ];
 
   xsession.enable = true;
@@ -19,8 +20,6 @@ in {
   home.sessionVariables = {
     WLR_DRM_NO_ATOMIC = "1";
     GRIM_DEFAULT_DIR = "$HOME/Pictures/Screenshots";
-    EDITOR = "emacsclient -c -a emacs";
-    VISUAL = "emacsclient -c -a emacs";
     SUDO_EDITOR = "emacsclient -c -a emacs";
     BROWSER = "firefox";
     CHROME_EXECUTABLE = chromeExecutable;
@@ -40,38 +39,6 @@ in {
     };
   };
   xdg.enable = true;
-  xdg.desktopEntries.emacsclient = {
-    name = "Emacs Client";
-    genericName = "Text Editor";
-    comment = "Edit text with Emacs (client)";
-    type = "Application";
-    exec = "emacsclient -c -a emacs %F";
-    terminal = false;
-    categories = [ "Development" "TextEditor" ];
-    mimeType = [
-      "text/plain"
-      "text/markdown"
-      "text/x-shellscript"
-      "text/x-yaml"
-      "text/x-toml"
-      "text/x-python"
-      "text/x-c"
-      "text/x-c++"
-      "text/x-go"
-      "text/x-rust"
-      "text/x-java"
-      "text/x-kotlin"
-      "text/x-clojure"
-      "text/x-lua"
-      "text/x-php"
-      "text/x-ruby"
-      "text/x-perl"
-      "text/x-sql"
-      "text/x-makefile"
-      "application/json"
-      "application/xml"
-    ];
-  };
 
   xdg.mimeApps = {
     enable = true;

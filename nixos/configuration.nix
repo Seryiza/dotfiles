@@ -210,7 +210,6 @@ in {
     glibcLocales
     busybox
     iputils
-    config.services.emacs.package
   ];
 
   environment.variables = { QT_QPA_PLATFORM = "wayland"; };
@@ -279,12 +278,6 @@ in {
         }
       ];
     };
-  };
-
-  services.emacs = {
-    enable = true;
-    package = (pkgs.emacsPackagesFor pkgs.emacs-pgtk).emacsWithPackages
-      (epkgs: [ epkgs.mu4e epkgs.vterm epkgs.melpaPackages.telega ]);
   };
 
   # Samba
