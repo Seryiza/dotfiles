@@ -2,6 +2,7 @@
 /vault-password
 .codex
 /.agent-shell
+/.dirge
 
 /.vagrant
 /*.log
