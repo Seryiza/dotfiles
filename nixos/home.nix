@@ -13,20 +13,6 @@ in {
     ./home/emacs.nix
   ];
 
-  wayland.windowManager.mango = {
-    enable = true;
-    settings = {
-      monitorrule = "name:^eDP-1$,width:2560,height:1600,refresh:240,x:0,y:0,scale:2";
-      bind = [
-        "SUPER,Return,spawn,alacritty"
-        "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
-        "SUPER,q,killclient"
-        "SUPER+SHIFT,e,quit"
-        "SUPER,r,reload_config"
-      ];
-    };
-  };
-
   xsession.enable = true;
 
   fonts.fontconfig.enable = true;

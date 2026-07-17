@@ -58,7 +58,7 @@
 
           ./nixos/configuration.nix
           sysc-greet.nixosModules.default
-          mango.nixosModules.mango
+          (import ./nixos/home/mango.nix { inherit mango; }).nixosModule
 
           home-manager.nixosModules.home-manager
           {
@@ -67,7 +67,7 @@
             home-manager.backupFileExtension = "bak";
             home-manager.users.seryiza = {
               imports = [
-                mango.hmModules.mango
+                (import ./nixos/home/mango.nix { inherit mango; }).homeManagerModule
                 ./nixos/home.nix
               ];
             };

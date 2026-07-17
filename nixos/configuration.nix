@@ -337,15 +337,7 @@ in {
     package = null;
   };
 
-  programs.mango = {
-    enable = true;
-    addLoginEntry = false;
-  };
-
-  services.displayManager.sessionPackages = [
-    swaySession
-    config.programs.mango.package
-  ];
+  services.displayManager.sessionPackages = [ swaySession ];
 
   programs.uwsm = {
     enable = true;
