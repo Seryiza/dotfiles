@@ -143,14 +143,14 @@ in
     pkgs.zprint
     pkgs.geckodriver
     pkgs.amberol
-    pkgs.tuigreet
     pkgs.gcc
     pkgs.nodejs_22
     pkgs.unzip
     pkgs.clojure
     pkgs.babashka
     pkgs.emacs-lsp-booster
-    unstable-pkgs.zed-editor-fhs
+    inputs.zed.packages.${system}.default
+    inputs.dirge.packages.${system}.default
     pkgs.htop
     pkgs.rocmPackages.rocminfo
     pkgs.rocmPackages.rocm-smi
@@ -189,5 +189,7 @@ in
     pkgs.chez
     pkgs.cambalache
     pkgs.postman
+    pkgs.insomnia
+    pkgs.baobab
   ];
 }

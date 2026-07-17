@@ -27,9 +27,19 @@
     iwmenu.url = "github:e-tho/iwmenu";
     rep.url = "github:eraserhd/rep";
     llm-agents.url = "github:numtide/llm-agents.nix";
+    sysc-greet = {
+      url = "github:Nomadcxx/sysc-greet";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    mango.url = "github:mangowm/mango";
+    zed.url = "github:zed-industries/zed/v1.10.1";
+    dirge = {
+      url = "github:dirge-code/dirge";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, nur, emacs-lsp-booster, xremap, ...
+  outputs = { self, nixpkgs, home-manager, nur, emacs-lsp-booster, xremap, sysc-greet, mango, ...
     }@inputs: {
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -47,13 +57,20 @@
           }
 
           ./nixos/configuration.nix
+          sysc-greet.nixosModules.default
+          mango.nixosModules.mango
 
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.backupFileExtension = "bak";
-            home-manager.users.seryiza = import ./nixos/home.nix;
+            home-manager.users.seryiza = {
+              imports = [
+                mango.hmModules.mango
+                ./nixos/home.nix
+              ];
+            };
             home-manager.sharedModules = [ xremap.homeManagerModules.default ];
             home-manager.extraSpecialArgs = inputs;
           }
