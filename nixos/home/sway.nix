@@ -22,9 +22,16 @@
   wayland.windowManager.sway = {
     enable = true;
     wrapperFeatures.gtk = true;
-    systemd.enable = true;
-    package =
-      nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sway;
+    systemd.enable = false;
+    package = pkgs.symlinkJoin {
+      name = "sway-without-session-entry";
+      paths = [
+        nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sway
+      ];
+      postBuild = ''
+        rm -f $out/share/wayland-sessions/sway.desktop
+      '';
+    };
 
     extraSessionCommands = ''
       export SDL_VIDEODRIVER=wayland
@@ -42,7 +49,10 @@
     '';
 
     config = {
-      startup = [{ command = "brightnessctl set 80%"; }];
+      startup = [
+        { command = "uwsm finalize"; }
+        { command = "brightnessctl set 80%"; }
+      ];
 
       modifier = "Mod4";
 
@@ -66,6 +76,7 @@
           "${modifier}+Alt+l" = "workspace next";
           "${modifier}+Return" = "exec alacritty";
           "${modifier}+Escape" = "exec swaylock -c 000000";
+          "${modifier}+Shift+e" = lib.mkForce "exec uwsm stop";
           "${modifier}+u" = lib.mkForce "exec sway-smart-close";
           "${modifier}+n" = ''exec wmenu-run -i -b -l 10 -f "Iosevka 14"'';
           "${modifier}+Alt+n" = ''exec wmenu-run -i -b -l 10 -f "Iosevka 14"'';

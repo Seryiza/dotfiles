@@ -9,6 +9,27 @@ let
     config = pkgs.config;
   };
 
+  systemSway = pkgs.symlinkJoin {
+    name = "sway-without-session-entry";
+    paths = [ pkgs.sway ];
+    postBuild = ''
+      rm -f $out/share/wayland-sessions/sway.desktop
+    '';
+  };
+
+  swaySession = (pkgs.runCommand "00-sway-uwsm-session" {} ''
+    mkdir -p $out/share/wayland-sessions
+    cat > $out/share/wayland-sessions/00-sway-uwsm.desktop <<EOF
+    [Desktop Entry]
+    Name=Sway
+    Comment=Sway compositor managed by UWSM
+    Exec=${config.programs.uwsm.package}/bin/uwsm start -F -- /run/current-system/sw/bin/sway
+    Type=Application
+    EOF
+  '').overrideAttrs {
+    passthru.providedSessions = [ "00-sway-uwsm" ];
+  };
+
   rocmEnv = pkgs.symlinkJoin {
     name = "rocm-combined";
     paths = with pkgs.rocmPackages; [
@@ -207,6 +228,7 @@ in {
   environment.localBinInPath = true;
 
   environment.systemPackages = with pkgs; [
+    swaySession
     glibcLocales
     busybox
     iputils
@@ -304,18 +326,31 @@ in {
     };
   };
 
-  services.greetd = {
+  services.sysc-greet = {
     enable = true;
-    settings = rec {
-      initial_session = {
-        command = "${pkgs.sway}/bin/sway";
-        user = "seryiza";
-      };
-      default_session = initial_session;
-    };
+    compositor = "sway";
+    swayPackage = systemSway;
   };
 
-  programs.sway = { enable = true; };
+  programs.sway = {
+    enable = true;
+    package = null;
+  };
+
+  programs.mango = {
+    enable = true;
+    addLoginEntry = false;
+  };
+
+  services.displayManager.sessionPackages = [
+    swaySession
+    config.programs.mango.package
+  ];
+
+  programs.uwsm = {
+    enable = true;
+    waylandCompositors = {};
+  };
 
   services.dbus.enable = true;
 

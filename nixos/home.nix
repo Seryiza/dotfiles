@@ -13,6 +13,16 @@ in {
     ./home/emacs.nix
   ];
 
+  wayland.windowManager.mango = {
+    enable = true;
+    settings.bind = [
+      "SUPER,Return,spawn,alacritty"
+      "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
+      "SUPER,q,killclient"
+      "SUPER+SHIFT,e,quit"
+    ];
+  };
+
   xsession.enable = true;
 
   fonts.fontconfig.enable = true;
