@@ -1,8 +1,22 @@
-{ config, ... }: {
+{
+  config,
+  pkgs,
+  waybar-src,
+  ...
+}:
+{
   programs.waybar = {
     enable = true;
+    package = pkgs.waybar.overrideAttrs (old: {
+      src = waybar-src;
+      mesonFlags = old.mesonFlags ++ [
+        "-Dmango=true"
+        "-Dwwan=disabled"
+        "-Dcava=disabled"
+      ];
+    });
     systemd.enable = true;
-    systemd.targets = ["graphical-session.target"];
+    systemd.targets = [ "graphical-session.target" ];
 
     settings = [
       {
@@ -12,6 +26,7 @@
         spacing = 0;
         modules-left = [
           "sway/window"
+          "mango/window"
         ];
         modules-center = [ ];
         modules-right = [
@@ -20,6 +35,7 @@
           "network"
           "custom/wireguard"
           "sway/language"
+          "mango/language"
           "battery"
           "clock"
           "tray"
@@ -31,10 +47,20 @@
           interval = 15;
           return-type = "json";
         };
-
         "sway/workspaces" = {
           disable-scroll = true;
         };
+
+        "mango/window" = {
+          format = "{}";
+          icon-size = 20;
+          max-length = 80;
+        };
+
+        "mango/language" = {
+          format = "{short}";
+        };
+
         "privacy" = {
           icon-size = 12;
           icon-spacing = 0;
@@ -123,8 +149,24 @@
         ];
         modules-center = [ ];
         modules-right = [
+          "mango/layout"
           "sway/workspaces"
+          "mango/workspaces"
         ];
+
+        "mango/layout" = {
+          format = "{}";
+          format-S = "Scroller";
+          format-T = "Tile";
+        };
+
+        "mango/workspaces" = {
+          format = "{icon}";
+          hide-empty = false;
+          on-click = "activate";
+          on-click-right = "toggle";
+          overview-label = "OVERVIEW";
+        };
 
         "custom/org_timeblock" = {
           exec = "${config.home.homeDirectory}/.local/bin/waybar-org-timeblock";

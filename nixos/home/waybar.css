@@ -126,6 +126,11 @@ button:hover {
     margin: 0;
 }
 
+/* Separate Mango's layout label from the following tag list. */
+.modules-right > widget > #layout {
+    margin-right: 10px;
+}
+
 /* If workspaces is the leftmost module, omit left margin */
 .modules-left > widget:first-child > #workspaces {
     margin-left: 0;

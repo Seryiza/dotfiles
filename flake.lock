@@ -794,6 +794,7 @@
         "nur": "nur",
         "rep": "rep",
         "sysc-greet": "sysc-greet",
+        "waybar-src": "waybar-src",
         "xremap": "xremap",
         "zed": "zed",
         "zen-browser": "zen-browser"
@@ -994,6 +995,23 @@
       "original": {
         "owner": "numtide",
         "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "waybar-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784233463,
+        "narHash": "sha256-0CpeSWMuLePAh7wmTb7OUAlmUSlerEWDb4EoFIIFPhs=",
+        "owner": "Alexays",
+        "repo": "Waybar",
+        "rev": "7f732f055316d3b0ab89f57e4347d24c1cc96167",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Alexays",
+        "repo": "Waybar",
+        "rev": "7f732f055316d3b0ab89f57e4347d24c1cc96167",
         "type": "github"
       }
     },
