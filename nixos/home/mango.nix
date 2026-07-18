@@ -1,22 +1,18 @@
 { mango }:
 {
   nixosModule =
-    { config, pkgs, ... }:
+    { pkgs, ... }:
     let
-      mangoSession =
-        (pkgs.runCommand "01-mango-uwsm-session" { } ''
-          mkdir -p $out/share/wayland-sessions
-          cat > $out/share/wayland-sessions/01-mango-uwsm.desktop <<EOF
-          [Desktop Entry]
-          Name=Mango
-          Comment=Mango compositor managed by UWSM
-          Exec=${config.programs.uwsm.package}/bin/uwsm start -F -- ${config.programs.mango.package}/bin/mango
-          Type=Application
-          EOF
-        '').overrideAttrs
-          {
-            passthru.providedSessions = [ "01-mango-uwsm" ];
-          };
+      # UWSM links all packages' Wayland session entries into the display
+      # manager's session directory. Remove Mango's plain `Exec=mango` entry so
+      # sysc-greet cannot bypass the UWSM-managed session.
+      mangoPackage = pkgs.symlinkJoin {
+        name = "mango-without-plain-session";
+        paths = [ mango.packages.${pkgs.stdenv.hostPlatform.system}.mango ];
+        postBuild = ''
+          rm -f $out/share/wayland-sessions/mango.desktop
+        '';
+      };
     in
     {
       imports = [ mango.nixosModules.mango ];
@@ -24,9 +20,14 @@
       programs.mango = {
         enable = true;
         addLoginEntry = false;
+        package = mangoPackage;
       };
 
-      services.displayManager.sessionPackages = [ mangoSession ];
+      programs.uwsm.waylandCompositors.mango = {
+        prettyName = "Mango";
+        comment = "Mango compositor managed by UWSM";
+        binPath = "/run/current-system/sw/bin/mango";
+      };
     };
 
   homeManagerModule =
