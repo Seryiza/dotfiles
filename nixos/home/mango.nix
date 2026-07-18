@@ -31,7 +31,7 @@
     };
 
   homeManagerModule =
-    { config, ... }:
+    { config, pkgs, ... }:
     {
       imports = [ mango.hmModules.mango ];
 
@@ -79,13 +79,14 @@
 
           bind = [
             "SUPER,Return,spawn,alacritty"
-            "SUPER,Escape,spawn,swaylock -c 000000"
+            "SUPER,Escape,spawn,${pkgs.swaylock}/bin/swaylock -c 000000"
             "SUPER+SHIFT,e,spawn,uwsm stop"
             "SUPER,u,killclient"
             "SUPER,h,focusdir,left"
             "SUPER,l,focusdir,right"
             "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER+ALT,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
+            "SUPER,m,spawn,emacsclient -c"
             "SUPER+ALT,m,spawn,emacsclient -c"
             "SUPER+SHIFT,b,spawn,run-work-browser"
             "SUPER,e,spawn,env QT_QPA_PLATFORM=xcb Enpass"
