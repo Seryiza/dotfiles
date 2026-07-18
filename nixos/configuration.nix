@@ -2,19 +2,11 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, nixpkgs-unstable, ... }:
+{ config, pkgs, nixpkgs-unstable, sysc-greet, ... }:
 let
   unstable-pkgs = import nixpkgs-unstable {
     inherit (pkgs.stdenv.hostPlatform) system;
     config = pkgs.config;
-  };
-
-  systemSway = pkgs.symlinkJoin {
-    name = "sway-without-session-entry";
-    paths = [ pkgs.sway ];
-    postBuild = ''
-      rm -f $out/share/wayland-sessions/sway.desktop
-    '';
   };
 
   swaySession = (pkgs.runCommand "00-sway-uwsm-session" {} ''
@@ -328,8 +320,7 @@ in {
 
   services.sysc-greet = {
     enable = true;
-    compositor = "sway";
-    swayPackage = systemSway;
+    compositorCommand = "${sysc-greet.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/sysc-greet";
   };
 
   programs.sway = {
