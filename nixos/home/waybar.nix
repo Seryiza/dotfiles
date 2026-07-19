@@ -21,6 +21,7 @@
     settings = [
       {
         name = "top";
+        layer = "top";
         position = "top";
         height = 20;
         spacing = 0;
@@ -138,6 +139,7 @@
 
       {
         name = "bottom";
+        layer = "top";
         position = "bottom";
         height = 20;
         spacing = 0;
