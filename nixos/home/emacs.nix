@@ -17,4 +17,10 @@
     defaultEditor = true;
     startWithUserSession = "graphical";
   };
+
+  systemd.user.services.emacs.Service = {
+    Slice = "app-graphical.slice";
+    ExecStop =
+      "${pkgs.emacs-pgtk}/bin/emacsclient --eval '(kill-emacs)'";
+  };
 }
