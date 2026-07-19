@@ -49,6 +49,7 @@
           tagrule = map (tag: "id:${toString tag},layout_name:scroller") (
             builtins.genList (index: index + 1) 9
           );
+          circle_layout = "scroller,tile,monocle";
 
           # Keep Telegram's transient media viewer out of the scroller layout.
           # Match both fields so the main Telegram window remains tiled.
@@ -60,10 +61,17 @@
           scroller_structs = 40;
           scroller_proportion_preset = "0.5,0.75,0.9";
 
-          # Fast scroller movement with a non-linear ease-out curve.
-          animations = 1;
-          animation_duration_move = 150;
-          animation_curve_move = "0.22,1.0,0.36,1.0";
+          gappih = 10;
+          gappiv = 10;
+          gappoh = 5;
+          gappov = 5;
+          borderpx = 3;
+          rootcolor = "0xffffffff";
+          bordercolor = "0xd3d3d3ff";
+          focuscolor = "0x000000ff";
+
+          animations = 0;
+          layer_animations = 0;
 
           cursor_theme = config.home.pointerCursor.name;
           cursor_size = config.home.pointerCursor.size;
@@ -76,21 +84,35 @@
           trackpad_natural_scrolling = 1;
           disable_while_typing = 1;
           middle_button_emulation = 1;
+          sloppyfocus = 0;
+          focus_on_activate = 0;
 
           bind = [
             "SUPER,Return,spawn,alacritty"
             "SUPER,Escape,spawn,${pkgs.swaylock}/bin/swaylock -c 000000"
             "SUPER+SHIFT,e,spawn,uwsm stop"
             "SUPER,u,killclient"
+            "SUPER,f,togglefullscreen,"
+            "SUPER,Tab,toggleoverview"
+            "SUPER+SHIFT,Tab,togglejump"
+            "SUPER,bracketleft,switch_layout"
             "SUPER,h,focusdir,left"
             "SUPER,l,focusdir,right"
+            "SUPER+ALT,l,viewtoright,0"
+            "SUPER+ALT,h,viewtoleft,0"
             "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER+ALT,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER,m,spawn,emacsclient -c"
             "SUPER+ALT,m,spawn,emacsclient -c"
             "SUPER+SHIFT,b,spawn,run-work-browser"
             "SUPER,e,spawn,env QT_QPA_PLATFORM=xcb Enpass"
-
+          ]
+          ++ builtins.concatMap (tag: [
+            "CTRL,${toString tag},view,${toString tag},0"
+            "ALT,${toString tag},tag,${toString tag},0"
+            "ALT+SHIFT,${toString tag},toggletag,${toString tag}"
+          ]) (builtins.genList (index: index + 1) 9)
+          ++ [
             ''NONE,Print,spawn_shell,grim -g "$(slurp)" - | wl-copy''
             ''CTRL,Print,spawn_shell,grim -g "$(slurp)"''
             "SHIFT,Print,spawn_shell,grim - | wl-copy | drawing -c"
