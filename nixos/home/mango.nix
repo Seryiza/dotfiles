@@ -59,12 +59,12 @@
 
           # Scroller geometry and window-width presets.
           scroller_structs = 40;
-          scroller_proportion_preset = "0.5,0.75,0.9";
+          scroller_proportion_preset = "0.5,0.75,1.0";
 
           gappih = 10;
           gappiv = 10;
-          gappoh = 5;
-          gappov = 5;
+          gappoh = 10;
+          gappov = 10;
           borderpx = 3;
           rootcolor = "0xffffffff";
           bordercolor = "0xd3d3d3ff";
