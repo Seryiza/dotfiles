@@ -1,0 +1,106 @@
+--- a/include/modules/wlr/taskbar.hpp
++++ b/include/modules/wlr/taskbar.hpp
+@@ -22,0 +23,3 @@
++#ifdef HAVE_MANGO
++#include "modules/mango/backend.hpp"
++#endif
+@@ -118,0 +122 @@
++  void set_filter_visible(bool visible);
+@@ -157 +161,5 @@
+-class Taskbar : public waybar::AModule {
++class Taskbar : public waybar::AModule
++#ifdef HAVE_MANGO
++              , public waybar::modules::mango::EventHandler
++#endif
++{
+@@ -167,0 +176,3 @@
++#ifdef HAVE_MANGO
++  void onEvent(const Json::Value&) override;
++#endif
+--- a/src/modules/wlr/taskbar.cpp
++++ b/src/modules/wlr/taskbar.cpp
+@@ -15,0 +16 @@
++#include <stdexcept>
+@@ -21,0 +23,3 @@
++#ifdef HAVE_MANGO
++#include "modules/mango/backend.hpp"
++#endif
+@@ -411,0 +416,8 @@
++void Task::set_filter_visible(bool visible) {
++  if (visible && !ignored_ && !squashed_ && (tbar_->all_outputs() || on_bar_output_)) {
++    show_button();
++  } else if (!visible) {
++    hide_button();
++  }
++}
++
+@@ -787,0 +800,6 @@
++
++#ifdef HAVE_MANGO
++  if (config_["mango-current-tags-only"].asBool()) {
++    waybar::modules::mango::IPC::getInstance().registerForIPC("monitor", this);
++  }
++#endif
+@@ -790,0 +809,6 @@
++#ifdef HAVE_MANGO
++  if (config_["mango-current-tags-only"].asBool()) {
++    waybar::modules::mango::IPC::getInstance().unregisterForIPC(this);
++  }
++#endif
++
+@@ -837,0 +862,50 @@
++#ifdef HAVE_MANGO
++  if (config_["mango-current-tags-only"].asBool()) {
++    try {
++      Json::Value request;
++      request["command"] = "get all-clients";
++      const auto response = waybar::modules::mango::IPC::send(request);
++      const auto& clients = response["clients"];
++      if (!clients.isArray()) {
++        throw std::runtime_error("Mango IPC returned no clients array");
++      }
++      std::vector<bool> claimed(clients.size(), false);
++
++      const auto apply_visibility = [&](TaskPtr& task) {
++        bool visible = false;
++        const int passes = task->active() ? 2 : 1;
++        for (int pass = 0; pass < passes && !visible; ++pass) {
++          for (Json::ArrayIndex i = 0; i < clients.size(); ++i) {
++            const auto& client = clients[i];
++            const bool require_focused = task->active() && pass == 0;
++            if (claimed[i] || !client["is_visible"].asBool() ||
++                (require_focused && !client["is_focused"].asBool()) ||
++                client["monitor"].asString() != bar_.output->name ||
++                client["title"].asString() != task->title() ||
++                client["appid"].asString() != task->app_id()) {
++              continue;
++            }
++            claimed[i] = true;
++            visible = true;
++            break;
++          }
++        }
++        task->set_filter_visible(visible);
++      };
++
++      // Claim the focused Mango client for the active foreign-toplevel first.
++      for (auto& task : tasks_) {
++        if (task->active()) apply_visibility(task);
++      }
++      for (auto& task : tasks_) {
++        if (!task->active()) apply_visibility(task);
++      }
++    } catch (const std::exception& e) {
++      spdlog::warn("Failed to filter taskbar using Mango IPC: {}", e.what());
++      for (auto& task : tasks_) {
++        task->set_filter_visible(false);
++      }
++    }
++  }
++#endif
++
+@@ -1035,0 +1110,4 @@
++
++#ifdef HAVE_MANGO
++void Taskbar::onEvent(const Json::Value&) { dp.emit(); }
++#endif

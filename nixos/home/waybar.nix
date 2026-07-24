@@ -7,12 +7,15 @@
 {
   programs.waybar = {
     enable = true;
-    package = pkgs.waybar.overrideAttrs (old: {
+    package = (pkgs.waybar.override {
+      cavaSupport = false;
+      runTests = false;
+    }).overrideAttrs (old: {
       src = waybar-src;
+      patches = (old.patches or [ ]) ++ [ ./waybar-taskbar-current-tags.patch ];
       mesonFlags = old.mesonFlags ++ [
         "-Dmango=true"
         "-Dwwan=disabled"
-        "-Dcava=disabled"
       ];
     });
     systemd.enable = true;
@@ -21,7 +24,10 @@
     settings = [
       {
         name = "top";
-        layer = "top";
+        # Mango arranges exclusive overlay surfaces before top-layer surfaces,
+        # so this bar spans the output before the left bar takes its space.
+        layer = "overlay";
+        exclusive = true;
         position = "top";
         height = 20;
         spacing = 0;
@@ -186,6 +192,29 @@
           max-length = 60;
           escape = true;
           hide-empty-text = true;
+        };
+      }
+
+      {
+        name = "left";
+        layer = "top";
+        position = "left";
+        width = 180;
+        spacing = 0;
+        modules-left = [ "wlr/taskbar" ];
+        modules-center = [ ];
+        modules-right = [ ];
+
+        "wlr/taskbar" = {
+          format = "{title}";
+          truncate = true;
+          # Added by waybar-taskbar-current-tags.patch; uses Mango's is_visible flag.
+          mango-current-tags-only = true;
+          tooltip = true;
+          tooltip-format = "{title}";
+          on-click = "activate";
+          on-click-middle = "close";
+          on-click-right = "minimize";
         };
       }
     ];
