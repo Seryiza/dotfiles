@@ -1,6 +1,7 @@
 /passwords.yml
 /vault-password
 .codex
+/.rpiv
 /.agent-shell
 /.dirge
 
