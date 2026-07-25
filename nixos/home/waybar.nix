@@ -4,39 +4,75 @@
   waybar-src,
   ...
 }:
+let
+  barHeight = 20;
+in
 {
   programs.waybar = {
     enable = true;
-    package = (pkgs.waybar.override {
-      cavaSupport = false;
-      runTests = false;
-    }).overrideAttrs (old: {
-      src = waybar-src;
-      patches = (old.patches or [ ]) ++ [ ./waybar-taskbar-current-tags.patch ];
-      mesonFlags = old.mesonFlags ++ [
-        "-Dmango=true"
-        "-Dwwan=disabled"
-      ];
-    });
+    package =
+      (pkgs.waybar.override {
+        cavaSupport = false;
+      }).overrideAttrs
+        (old: {
+          src = waybar-src;
+          patches = (old.patches or [ ]) ++ [
+            ./waybar-mango-taskbar.patch
+            ./waybar-mango-workspaces.patch
+            ./waybar-mango-tests.patch
+          ];
+          mesonFlags = old.mesonFlags ++ [
+            "-Dmango=true"
+            "-Dwwan=disabled"
+          ];
+        });
     systemd.enable = true;
     systemd.targets = [ "graphical-session.target" ];
 
     settings = [
       {
-        name = "top";
-        # Mango arranges exclusive overlay surfaces before top-layer surfaces,
-        # so this bar spans the output before the left bar takes its space.
-        layer = "overlay";
-        exclusive = true;
-        position = "top";
-        height = 20;
+        name = "right";
+        layer = "top";
+        position = "right";
+        width = 250;
         spacing = 0;
         modules-left = [
-          "sway/window"
-          "mango/window"
+          "mango/taskbar"
         ];
         modules-center = [ ];
         modules-right = [
+          "mango/workspaces"
+        ];
+
+        "mango/taskbar" = {
+          format = "{title}";
+          justify = "left";
+          truncate = true;
+          tooltip = true;
+          tooltip-format = "{title}";
+          on-click = "activate";
+          on-click-middle = "close";
+          on-click-right = "minimize";
+        };
+
+        "mango/workspaces" = {
+          orientation = "horizontal";
+          homogeneous = true;
+          height = barHeight;
+          format = "{icon}";
+          hide-empty = false;
+          on-click = "activate";
+          on-click-right = "toggle";
+          overview-label = "OVERVIEW";
+        };
+      }
+      {
+        name = "top";
+        layer = "top";
+        position = "top";
+        height = barHeight;
+        spacing = 0;
+        modules-left = [
           "privacy"
           "wireplumber"
           "network"
@@ -47,6 +83,8 @@
           "clock"
           "tray"
         ];
+        modules-center = [ ];
+        modules-right = [ "mango/layout" ];
 
         "custom/wireguard" = {
           format = "{text}";
@@ -54,18 +92,16 @@
           interval = 15;
           return-type = "json";
         };
-        "sway/workspaces" = {
-          disable-scroll = true;
-        };
-
-        "mango/window" = {
-          format = "{}";
-          icon-size = 20;
-          max-length = 80;
-        };
 
         "mango/language" = {
           format = "{short}";
+        };
+
+        "mango/layout" = {
+          format = "{}";
+          format-S = "Scroller";
+          format-T = "Tile";
+          format-M = "Monocle";
         };
 
         "privacy" = {
@@ -140,81 +176,6 @@
           format-source = " +MIC";
           format-source-muted = "";
           tooltip-format = "{node_name}: {volume}%{format_source}";
-        };
-      }
-
-      {
-        name = "bottom";
-        layer = "top";
-        position = "bottom";
-        height = 20;
-        spacing = 0;
-        modules-left = [
-          "sway/mode"
-          "sway/scratchpad"
-          "custom/org_timeblock"
-          "custom/org_clock"
-        ];
-        modules-center = [ ];
-        modules-right = [
-          "mango/layout"
-          "sway/workspaces"
-          "mango/workspaces"
-        ];
-
-        "mango/layout" = {
-          format = "{}";
-          format-S = "Scroller";
-          format-T = "Tile";
-        };
-
-        "mango/workspaces" = {
-          format = "{icon}";
-          hide-empty = false;
-          on-click = "activate";
-          on-click-right = "toggle";
-          overview-label = "OVERVIEW";
-        };
-
-        "custom/org_timeblock" = {
-          exec = "${config.home.homeDirectory}/.local/bin/waybar-org-timeblock";
-          interval = 15;
-          format = "{text}";
-          max-length = 60;
-          escape = true;
-          hide-empty-text = true;
-        };
-
-        "custom/org_clock" = {
-          exec = "${config.home.homeDirectory}/.local/bin/waybar-org-current-clock";
-          interval = 15;
-          format = "{text}";
-          max-length = 60;
-          escape = true;
-          hide-empty-text = true;
-        };
-      }
-
-      {
-        name = "left";
-        layer = "top";
-        position = "left";
-        width = 180;
-        spacing = 0;
-        modules-left = [ "wlr/taskbar" ];
-        modules-center = [ ];
-        modules-right = [ ];
-
-        "wlr/taskbar" = {
-          format = "{title}";
-          truncate = true;
-          # Added by waybar-taskbar-current-tags.patch; uses Mango's is_visible flag.
-          mango-current-tags-only = true;
-          tooltip = true;
-          tooltip-format = "{title}";
-          on-click = "activate";
-          on-click-middle = "close";
-          on-click-right = "minimize";
         };
       }
     ];

@@ -1,0 +1,1256 @@
+diff --git a/.github/wiki/mapping.json b/.github/wiki/mapping.json
+index d17338e..088e3c2 100644
+--- a/.github/wiki/mapping.json
++++ b/.github/wiki/mapping.json
+@@ -25 +25 @@
+-  "Module:-Mango": ["waybar-mango-window", "waybar-mango-workspaces", "waybar-mango-keymode", "waybar-mango-layout"],
++  "Module:-Mango": ["waybar-mango-window", "waybar-mango-workspaces", "waybar-mango-taskbar", "waybar-mango-keymode", "waybar-mango-layout"],
+diff --git a/include/modules/mango/backend.hpp b/include/modules/mango/backend.hpp
+index 7e4313f..89b0b76 100644
+--- a/include/modules/mango/backend.hpp
++++ b/include/modules/mango/backend.hpp
+@@ -4,0 +5,2 @@
++#include <condition_variable>
++#include <deque>
+@@ -11,0 +14 @@
++#include "modules/mango/taskbar_model.hpp"
+@@ -32,0 +36 @@ class IPC {
++  void sendClientCommandAsync(const Json::Value& request, ClientId id, std::uint64_t generation);
+@@ -41,0 +46 @@ class IPC {
++  ClientCache getClientCache() const;
+@@ -43,0 +49,7 @@ class IPC {
++  struct SocketIdentity {
++    std::uint64_t device = 0;
++    std::uint64_t inode = 0;
++
++    bool operator==(const SocketIdentity&) const = default;
++  };
++
+@@ -47 +59,7 @@ class IPC {
+-  static int connectToSocket();
++  void startClientsIPC();
++  void runClientsIPC();
++  void startCommandIPC();
++  void runCommandIPC();
++  void enqueueCommand(const std::string& command, ClientId id = 0, std::uint64_t generation = 0);
++  static SocketIdentity getSocketIdentity();
++  static int connectToSocket(SocketIdentity* identity = nullptr);
+@@ -48,0 +67,6 @@ class IPC {
++  bool parseClientsIPC(const std::string& line, std::uint64_t generation);
++  std::uint64_t setClientsConnected(const SocketIdentity& identity);
++  void setClientsDisconnected(std::uint64_t generation);
++  bool clientCommandActionable(ClientId id, std::uint64_t generation,
++                               const SocketIdentity& identity) const;
++  void notify(const std::string& event, const Json::Value& payload = Json::nullValue);
+@@ -54 +78,3 @@ class IPC {
+-  static Json::Value sendCommand(const std::string& cmd);
++  static Json::Value sendCommand(const std::string& cmd, ClientId id = 0,
++                                 std::uint64_t generation = 0,
++                                 std::atomic<int>* tracked_fd = nullptr);
+@@ -57 +83,3 @@ class IPC {
+-  int sockfd_ = -1;
++  std::atomic<int> sockfd_ = -1;
++  std::atomic<int> clients_sockfd_ = -1;
++  std::atomic<int> command_sockfd_ = -1;
+@@ -58,0 +87,4 @@ class IPC {
++  std::thread clients_ipc_thread_;
++  std::thread command_ipc_thread_;
++  std::once_flag clients_start_once_;
++  std::once_flag command_start_once_;
+@@ -65,0 +98,11 @@ class IPC {
++  mutable std::mutex client_cache_mutex_;
++  ClientCache client_cache_;
++  SocketIdentity clients_socket_identity_;
++  struct PendingCommand {
++    std::string command;
++    ClientId id = 0;
++    std::uint64_t generation = 0;
++  };
++  std::mutex command_mutex_;
++  std::condition_variable command_condition_;
++  std::deque<PendingCommand> command_queue_;
+diff --git a/include/modules/mango/taskbar.hpp b/include/modules/mango/taskbar.hpp
+new file mode 100644
+index 0000000..98a9913
+--- /dev/null
++++ b/include/modules/mango/taskbar.hpp
+@@ -0,0 +1,58 @@
++#pragma once
++
++#include <gtkmm/box.h>
++#include <gtkmm/button.h>
++#include <gtkmm/label.h>
++#include <json/value.h>
++
++#include <cstdint>
++#include <memory>
++#include <string>
++#include <unordered_map>
++
++#include "AModule.hpp"
++#include "bar.hpp"
++#include "modules/mango/backend.hpp"
++
++namespace waybar::modules::mango {
++
++class Taskbar : public AModule, public EventHandler {
++ public:
++  Taskbar(const std::string&, const Bar&, const Json::Value&);
++  ~Taskbar() override;
++  void update() override;
++
++ private:
++  struct Task {
++    Task(ClientId id, std::uint64_t generation) : id(id), generation(generation) {}
++
++    ClientId id;
++    std::uint64_t generation;
++    Gtk::Label label;
++    Gtk::Button button;
++  };
++
++  void onEvent(const Json::Value& event) override;
++  void reconcile(const ClientCache& cache);
++  Task& addTask(ClientId id, std::uint64_t generation);
++  void clearTasks();
++  void updateTask(Task& task, const ClientInfo& client, bool actionable);
++  bool handleButtonClick(GdkEventButton* event, ClientId id);
++  std::string formatText(const std::string& format, const ClientInfo& client) const;
++  static std::string stateString(const ClientInfo& client);
++  static void setClass(const Glib::RefPtr<Gtk::StyleContext>& style, const std::string& name,
++                       bool enabled);
++
++  const Bar& bar_;
++  Gtk::Box box_;
++  std::unordered_map<ClientId, std::unique_ptr<Task>> tasks_;
++  std::uint64_t rendered_generation_ = 0;
++  bool all_outputs_ = false;
++  std::string format_ = "{title}";
++  std::string tooltip_format_ = "{title}";
++  std::string on_click_left_;
++  std::string on_click_middle_;
++  std::string on_click_right_;
++};
++
++}  // namespace waybar::modules::mango
+diff --git a/include/modules/mango/taskbar_model.hpp b/include/modules/mango/taskbar_model.hpp
+new file mode 100644
+index 0000000..ece947e
+--- /dev/null
++++ b/include/modules/mango/taskbar_model.hpp
+@@ -0,0 +1,118 @@
++#pragma once
++
++#include <json/value.h>
++
++#include <cstdint>
++#include <limits>
++#include <memory>
++#include <optional>
++#include <string>
++#include <unordered_map>
++#include <utility>
++#include <vector>
++
++namespace waybar::modules::mango {
++
++using ClientId = std::uint32_t;
++
++struct ClientInfo {
++  ClientId id = 0;
++  std::string title;
++  std::string app_id;
++  std::string monitor;
++  bool visible = false;
++  bool focused = false;
++  bool fullscreen = false;
++  bool maximized = false;
++  bool minimized = false;
++  bool urgent = false;
++};
++
++struct ClientSnapshot {
++  std::uint64_t generation = 0;
++  std::vector<ClientInfo> clients;
++  std::unordered_map<ClientId, std::size_t> index_by_id;
++};
++
++struct ClientCache {
++  std::shared_ptr<const ClientSnapshot> snapshot;
++  std::uint64_t generation = 0;
++  bool connected = false;
++  bool fresh = false;
++
++  bool actionable(ClientId id, std::uint64_t rendered_generation) const {
++    // Mango's current dispatch parser narrows explicit IDs through signed int.
++    // Keep larger uint32 identities visible, but never send an ambiguous action.
++    return id <= static_cast<ClientId>(std::numeric_limits<int>::max()) && connected && fresh &&
++           snapshot && generation == rendered_generation && snapshot->generation == generation &&
++           snapshot->index_by_id.contains(id);
++  }
++};
++
++inline std::optional<ClientSnapshot> parseClientSnapshot(const Json::Value& root,
++                                                         std::uint64_t generation,
++                                                         std::string* error = nullptr) {
++  const auto fail = [error](const std::string& message) -> std::optional<ClientSnapshot> {
++    if (error != nullptr) *error = message;
++    return std::nullopt;
++  };
++
++  if (!root.isObject() || !root.isMember("clients") || !root["clients"].isArray()) {
++    return fail("root must contain a clients array");
++  }
++
++  ClientSnapshot snapshot;
++  snapshot.generation = generation;
++  snapshot.clients.reserve(root["clients"].size());
++
++  for (const auto& value : root["clients"]) {
++    if (!value.isObject()) return fail("each client must be an object");
++
++    const auto& id = value["id"];
++    if (!id.isUInt64() || id.asUInt64() == 0 ||
++        id.asUInt64() > std::numeric_limits<ClientId>::max()) {
++      return fail("client id must be a non-zero uint32");
++    }
++
++    for (const auto* field : {"title", "appid", "monitor"}) {
++      if (!value[field].isString())
++        return fail(std::string("client field '") + field + "' must be a string");
++    }
++    for (const auto* field : {"is_visible", "is_focused", "is_fullscreen", "is_maximized",
++                              "is_minimized", "is_urgent"}) {
++      if (!value[field].isBool())
++        return fail(std::string("client field '") + field + "' must be a boolean");
++    }
++
++    ClientInfo client;
++    client.id = static_cast<ClientId>(id.asUInt64());
++    client.title = value["title"].asString();
++    client.app_id = value["appid"].asString();
++    client.monitor = value["monitor"].asString();
++    client.visible = value["is_visible"].asBool();
++    client.focused = value["is_focused"].asBool();
++    client.fullscreen = value["is_fullscreen"].asBool();
++    client.maximized = value["is_maximized"].asBool();
++    client.minimized = value["is_minimized"].asBool();
++    client.urgent = value["is_urgent"].asBool();
++
++    const auto index = snapshot.clients.size();
++    if (!snapshot.index_by_id.emplace(client.id, index).second) {
++      return fail("client ids must be unique");
++    }
++    snapshot.clients.push_back(std::move(client));
++  }
++
++  return snapshot;
++}
++
++inline std::vector<ClientId> visibleClientIds(const ClientSnapshot& snapshot,
++                                              const std::string& output, bool all_outputs = false) {
++  std::vector<ClientId> result;
++  for (const auto& client : snapshot.clients) {
++    if (client.visible && (all_outputs || client.monitor == output)) result.push_back(client.id);
++  }
++  return result;
++}
++
++}  // namespace waybar::modules::mango
+diff --git a/man/waybar-mango-taskbar.5.scd b/man/waybar-mango-taskbar.5.scd
+new file mode 100644
+index 0000000..510616f
+--- /dev/null
++++ b/man/waybar-mango-taskbar.5.scd
+@@ -0,0 +1,115 @@
++waybar-mango-taskbar(5)
++
++# NAME
++
++waybar - Mango taskbar module
++
++# DESCRIPTION
++
++The *mango/taskbar* module displays Mango clients visible on the selected tags. Client identity and ordering come directly from Mango's *watch all-clients* IPC snapshots, so windows with identical titles and application IDs remain distinct.
++
++# CONFIGURATION
++
++Addressed by *mango/taskbar*
++
++*format*: ++
++	typeof: string ++
++	default: {title} ++
++	The format for each client button. See *FORMAT REPLACEMENTS*.
++
++*all-outputs*: ++
++	typeof: bool ++
++	default: false ++
++	If false, only visible clients on the bar's output are shown. If true, visible clients from every output are shown.
++
++*justify*: ++
++	typeof: string ++
++	default: center ++
++	The button-label alignment. Supported values are *left*, *center*, and *right*.
++
++*truncate*: ++
++	typeof: bool ++
++	default: false ++
++	Ellipsizes labels that do not fit in the available space.
++
++*markup*: ++
++	typeof: bool ++
++	default: false ++
++	If true, formatted labels and tooltips are interpreted as Pango markup. Client-provided fields are escaped before formatting.
++
++*rewrite*: ++
++	typeof: object ++
++	Rules for rewriting formatted labels and tooltips.
++
++*tooltip*: ++
++	typeof: bool ++
++	default: true ++
++	Enables client tooltips.
++
++*tooltip-format*: ++
++	typeof: string ++
++	default: {title} ++
++	The tooltip format. Supports the same replacements as *format*.
++
++*on-click*: ++
++	typeof: string ++
++	Action for left click. Supported actions are *activate*, *close*, and *minimize*.
++
++*on-click-middle*: ++
++	typeof: string ++
++	Action for middle click. Supports the same actions as *on-click*.
++
++*on-click-right*: ++
++	typeof: string ++
++	Action for right click. Supports the same actions as *on-click*.
++
++# FORMAT REPLACEMENTS
++
++*{title}*: Client title.
++
++*{app_id}*: Client application ID.
++
++*{id}*: Mango client ID.
++
++*{state}*: Space-separated active states: *minimized*, *maximized*, *active*, *fullscreen*, and *urgent*.
++
++# CLICK ACTIONS
++
++*activate* dispatches *focusid* to the button's Mango client ID.
++
++*close* dispatches *killclient* to the button's Mango client ID.
++
++*minimize* dispatches *minimized* to the button's Mango client ID.
++
++Mango currently falls back to the focused client if an explicitly targeted client disappears before *close* or *minimize* is processed. This creates a small stale-ID race for those two actions. *activate* fails closed when its target no longer exists. Buttons remain visible but disabled if their ID exceeds Mango's current signed dispatch-parser range.
++
++# IPC RECOVERY
++
++The module shares one *watch all-clients* stream with all Mango taskbar instances in the Waybar process. During a disconnect, the last complete snapshot remains visible, the module receives the *disconnected* CSS class, and every client button is disabled. Buttons are rebuilt and re-enabled only after a complete snapshot for the new connection generation.
++
++The module consumes watch events without periodic polling. Rare inactive-title and ordering changes that Mango does not announce appear after the next all-client event.
++
++# EXAMPLES
++
++```
++"mango/taskbar": {
++	"format": "{title}",
++	"justify": "left",
++	"truncate": true,
++	"tooltip-format": "{title}",
++	"on-click": "activate",
++	"on-click-middle": "close",
++	"on-click-right": "minimize"
++}
++```
++
++# STYLE
++
++- *#taskbar*
++- *#taskbar.empty*
++- *#taskbar.disconnected*
++- *#taskbar button.active*
++- *#taskbar button.urgent*
++- *#taskbar button.minimized*
++- *#taskbar button.maximized*
++- *#taskbar button.fullscreen*
+diff --git a/meson.build b/meson.build
+index e3839cf..1062b12 100644
+--- a/meson.build
++++ b/meson.build
+@@ -371,0 +372 @@ if get_option('mango')
++        'src/modules/mango/taskbar.cpp',
+@@ -378,0 +380 @@ if get_option('mango')
++        'man/waybar-mango-taskbar.5.scd',
+diff --git a/src/factory.cpp b/src/factory.cpp
+index 86abb43..50eb18f 100644
+--- a/src/factory.cpp
++++ b/src/factory.cpp
+@@ -48,0 +49 @@
++#include "modules/mango/taskbar.hpp"
+@@ -249,0 +251,3 @@ waybar::AModule* waybar::Factory::makeModule(const std::string& name,
++    if (ref == "mango/taskbar") {
++      return new waybar::modules::mango::Taskbar(id, bar_, config_[name]);
++    }
+diff --git a/src/modules/mango/backend.cpp b/src/modules/mango/backend.cpp
+index 63aecb7..bd0196c 100644
+--- a/src/modules/mango/backend.cpp
++++ b/src/modules/mango/backend.cpp
+@@ -7,0 +8 @@
++#include <sys/stat.h>
+@@ -14 +14,0 @@
+-#include <vector>
+@@ -18,0 +19 @@ namespace waybar::modules::mango {
++namespace {
+@@ -20 +21,58 @@ namespace waybar::modules::mango {
+-int IPC::connectToSocket() {
++constexpr std::size_t kMaxIPCFrameSize = 1024 * 1024;
++constexpr std::size_t kMaxPendingCommands = 64;
++constexpr auto kCommandTimeout = std::chrono::seconds(2);
++
++int remainingTimeout(const std::chrono::steady_clock::time_point& deadline) {
++  const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
++      deadline - std::chrono::steady_clock::now());
++  return remaining > std::chrono::milliseconds::zero() ? static_cast<int>(remaining.count()) : 0;
++}
++
++bool writeAll(int fd, const std::string& value) {
++  const auto deadline = std::chrono::steady_clock::now() + kCommandTimeout;
++  std::size_t written = 0;
++  while (written < value.size()) {
++    const auto result = send(fd, value.data() + written, value.size() - written, MSG_NOSIGNAL);
++    if (result < 0) {
++      if (errno == EINTR) continue;
++      if (errno != EAGAIN && errno != EWOULDBLOCK) return false;
++
++      struct pollfd pfd = {.fd = fd, .events = POLLOUT, .revents = 0};
++      const auto timeout = remainingTimeout(deadline);
++      if (timeout == 0 || poll(&pfd, 1, timeout) <= 0 ||
++          (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
++        return false;
++      }
++      continue;
++    }
++    if (result == 0) return false;
++    written += static_cast<std::size_t>(result);
++  }
++  return true;
++}
++
++void closeOwnedFd(std::atomic<int>& slot, int fd) {
++  int expected = fd;
++  slot.compare_exchange_strong(expected, -1);
++  close(fd);
++}
++
++class TrackedFd {
++ public:
++  TrackedFd(std::atomic<int>* slot, int fd) : slot_(slot), fd_(fd) {
++    if (slot_ != nullptr) slot_->store(fd_);
++  }
++  ~TrackedFd() {
++    if (slot_ == nullptr) return;
++    int expected = fd_;
++    slot_->compare_exchange_strong(expected, -1);
++  }
++
++ private:
++  std::atomic<int>* slot_;
++  int fd_;
++};
++
++}  // namespace
++
++IPC::SocketIdentity IPC::getSocketIdentity() {
+@@ -25,0 +84,15 @@ int IPC::connectToSocket() {
++  struct stat socket_stat;
++  if (stat(socket_path, &socket_stat) == -1 || !S_ISSOCK(socket_stat.st_mode)) {
++    throw std::runtime_error("Mango IPC socket path is unavailable");
++  }
++  return {static_cast<std::uint64_t>(socket_stat.st_dev),
++          static_cast<std::uint64_t>(socket_stat.st_ino)};
++}
++
++int IPC::connectToSocket(SocketIdentity* identity) {
++  const char* socket_path = getenv("MANGO_INSTANCE_SIGNATURE");
++  if (!socket_path) {
++    throw std::runtime_error("Mango IPC: MANGO_INSTANCE_SIGNATURE not set");
++  }
++  const auto identity_before = getSocketIdentity();
++
+@@ -27 +100 @@ int IPC::connectToSocket() {
+-  util::ScopedFd fd(socket(AF_UNIX, SOCK_STREAM, 0));
++  util::ScopedFd fd(socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0));
+@@ -35 +108,20 @@ int IPC::connectToSocket() {
+-    throw std::runtime_error("connect() failed");
++    if (errno != EINPROGRESS && errno != EAGAIN) throw std::runtime_error("connect() failed");
++
++    const auto deadline = std::chrono::steady_clock::now() + kCommandTimeout;
++    struct pollfd pfd = {.fd = fd, .events = POLLOUT, .revents = 0};
++    int result;
++    do {
++      const auto timeout = remainingTimeout(deadline);
++      if (timeout == 0) throw std::runtime_error("connect() timed out");
++      result = poll(&pfd, 1, timeout);
++    } while (result < 0 && errno == EINTR);
++    if (result <= 0 || (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) {
++      throw std::runtime_error("connect() timed out");
++    }
++
++    int socket_error = 0;
++    socklen_t error_size = sizeof(socket_error);
++    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &socket_error, &error_size) == -1 ||
++        socket_error != 0) {
++      throw std::runtime_error("connect() failed");
++    }
+@@ -36,0 +129,6 @@ int IPC::connectToSocket() {
++
++  const auto identity_after = getSocketIdentity();
++  if (!(identity_before == identity_after)) {
++    throw std::runtime_error("Mango IPC socket changed while connecting");
++  }
++  if (identity != nullptr) *identity = identity_after;
+@@ -40,3 +138,5 @@ int IPC::connectToSocket() {
+-Json::Value IPC::sendCommand(const std::string& cmd) {
+-  util::ScopedFd fd(IPC::connectToSocket());
+-  std::string full_cmd = cmd + "\n";
++Json::Value IPC::sendCommand(const std::string& cmd, ClientId id, std::uint64_t generation,
++                             std::atomic<int>* tracked_fd) {
++  SocketIdentity command_identity;
++  util::ScopedFd fd(IPC::connectToSocket(&command_identity));
++  TrackedFd registration(tracked_fd, fd);
+@@ -44,8 +144,4 @@ Json::Value IPC::sendCommand(const std::string& cmd) {
+-  ssize_t total_written = 0;
+-  while (total_written < (ssize_t)full_cmd.size()) {
+-    ssize_t res = write(fd, full_cmd.c_str() + total_written, full_cmd.size() - total_written);
+-    if (res < 0) {
+-      if (errno == EINTR) continue;
+-      throw std::runtime_error("Failed to write command");
+-    }
+-    total_written += res;
++  // Validate after connecting and require the command socket to target the
++  // exact filesystem socket used by this client-stream generation.
++  if (id != 0 && !IPC::getInstance().clientCommandActionable(id, generation, command_identity)) {
++    return Json::nullValue;
+@@ -53,0 +150,3 @@ Json::Value IPC::sendCommand(const std::string& cmd) {
++  const std::string full_cmd = cmd + "\n";
++  if (!writeAll(fd, full_cmd)) throw std::runtime_error("Failed to write command");
++
+@@ -56,4 +155,22 @@ Json::Value IPC::sendCommand(const std::string& cmd) {
+-  while (true) {
+-    ssize_t n = read(fd, buf, sizeof(buf) - 1);
+-    if (n <= 0) {
+-      if (n == 0) break;
++  const auto deadline = std::chrono::steady_clock::now() + kCommandTimeout;
++  while (response.find('\n') == std::string::npos) {
++    const auto remaining = remainingTimeout(deadline);
++    if (remaining == 0) throw std::runtime_error("Mango IPC command timed out");
++
++    struct pollfd pfd = {.fd = fd, .events = POLLIN, .revents = 0};
++    const auto ready = poll(&pfd, 1, remaining);
++    if (ready == 0) throw std::runtime_error("Mango IPC command timed out");
++    if (ready < 0) {
++      if (errno == EINTR) continue;
++      throw std::runtime_error("Mango IPC command poll failed");
++    }
++    if (!(pfd.revents & POLLIN)) {
++      if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
++        throw std::runtime_error("Mango IPC command connection closed");
++      }
++      continue;
++    }
++
++    const auto n = read(fd, buf, sizeof(buf));
++    if (n == 0) throw std::runtime_error("Mango IPC command connection closed");
++    if (n < 0) {
+@@ -61 +178,5 @@ Json::Value IPC::sendCommand(const std::string& cmd) {
+-      throw std::runtime_error("Read error");
++      throw std::runtime_error("Mango IPC command read failed");
++    }
++    response.append(buf, n);
++    if (response.size() > kMaxIPCFrameSize) {
++      throw std::runtime_error("Mango IPC command response is too large");
+@@ -63,3 +183,0 @@ Json::Value IPC::sendCommand(const std::string& cmd) {
+-    buf[n] = '\0';
+-    response += buf;
+-    if (response.find('\n') != std::string::npos) break;
+@@ -86,2 +204,2 @@ void IPC::sendAsync(const Json::Value& request) {
+-  if (!request.isMember("command")) {
+-    spdlog::error("Mango IPC: request must have 'command' field");
++  if (!request.isMember("command") || !request["command"].isString()) {
++    spdlog::error("Mango IPC: request must have a string 'command' field");
+@@ -90 +208,2 @@ void IPC::sendAsync(const Json::Value& request) {
+-  std::string cmd = request["command"].asString();
++  IPC::getInstance().enqueueCommand(request["command"].asString());
++}
+@@ -92,7 +211,7 @@ void IPC::sendAsync(const Json::Value& request) {
+-  std::thread([cmd]() {
+-    try {
+-      IPC::sendCommand(cmd);
+-    } catch (const std::exception& e) {
+-      spdlog::error("IPC async send failed: {}", e.what());
+-    }
+-  }).detach();
++void IPC::sendClientCommandAsync(const Json::Value& request, ClientId id,
++                                 std::uint64_t generation) {
++  if (!request.isMember("command") || !request["command"].isString()) {
++    spdlog::error("Mango IPC: request must have a string 'command' field");
++    return;
++  }
++  enqueueCommand(request["command"].asString(), id, generation);
+@@ -101 +220 @@ void IPC::sendAsync(const Json::Value& request) {
+-IPC::IPC() : sockfd_(-1), active_client_(Json::nullValue) { startIPC(); }
++IPC::IPC() : active_client_(Json::nullValue) { startIPC(); }
+@@ -105 +224,4 @@ IPC::~IPC() {
+-  if (sockfd_ != -1) close(sockfd_);
++  for (const auto fd : {sockfd_.load(), clients_sockfd_.load(), command_sockfd_.load()}) {
++    if (fd != -1) shutdown(fd, SHUT_RDWR);
++  }
++  command_condition_.notify_all();
+@@ -106,0 +229,2 @@ IPC::~IPC() {
++  if (clients_ipc_thread_.joinable()) clients_ipc_thread_.join();
++  if (command_ipc_thread_.joinable()) command_ipc_thread_.join();
+@@ -119 +242,0 @@ void IPC::startIPC() {
+-    std::string buffer;
+@@ -122,3 +244,0 @@ void IPC::startIPC() {
+-    // Reconnect loop: if the event stream drops (POLLHUP/POLLERR, read()==0 or
+-    // an error) we back off briefly and re-establish the socket instead of
+-    // leaving every mango module frozen forever with stale content.
+@@ -125,0 +246 @@ void IPC::startIPC() {
++      int fd = sockfd_.load();
+@@ -128 +249,2 @@ void IPC::startIPC() {
+-          sockfd_ = IPC::connectToSocket();
++          fd = IPC::connectToSocket();
++          sockfd_ = fd;
+@@ -137,9 +259,3 @@ void IPC::startIPC() {
+-      bool subscribed = true;
+-      const std::vector<std::string> subs = {"watch all-monitors"};
+-      for (const auto& cmd : subs) {
+-        if (write(sockfd_, cmd.c_str(), cmd.size()) != (ssize_t)cmd.size() ||
+-            write(sockfd_, "\n", 1) != 1) {
+-          spdlog::error("Failed to subscribe to {}", cmd);
+-          subscribed = false;
+-          break;
+-        }
++      if (!running_) {
++        closeOwnedFd(sockfd_, fd);
++        break;
+@@ -147,5 +263,4 @@ void IPC::startIPC() {
+-      if (!subscribed) {
+-        if (sockfd_ != -1) {
+-          close(sockfd_);
+-          sockfd_ = -1;
+-        }
++
++      if (!writeAll(fd, "watch all-monitors\n")) {
++        spdlog::error("Failed to subscribe to watch all-monitors");
++        closeOwnedFd(sockfd_, fd);
+@@ -156,5 +271,2 @@ void IPC::startIPC() {
+-      struct pollfd pfd;
+-      pfd.fd = sockfd_;
+-      pfd.events = POLLIN;
+-      buffer.clear();
+-
++      struct pollfd pfd = {.fd = fd, .events = POLLIN, .revents = 0};
++      std::string buffer;
+@@ -168 +279,0 @@ void IPC::startIPC() {
+-          connected = false;
+@@ -171 +281,0 @@ void IPC::startIPC() {
+-
+@@ -174 +283,0 @@ void IPC::startIPC() {
+-          connected = false;
+@@ -176,0 +286 @@ void IPC::startIPC() {
++        if (!(pfd.revents & POLLIN)) continue;
+@@ -178,10 +288,19 @@ void IPC::startIPC() {
+-        if (pfd.revents & POLLIN) {
+-          ssize_t n = read(sockfd_, buf, sizeof(buf));
+-          if (n == 0) {
+-            spdlog::info("Mango IPC connection closed");
+-            connected = false;
+-            break;
+-          }
+-          if (n < 0) {
+-            if (errno == EINTR) continue;
+-            spdlog::error("IPC read error: {}", strerror(errno));
++        const auto n = read(fd, buf, sizeof(buf));
++        if (n == 0) {
++          spdlog::info("Mango IPC connection closed");
++          break;
++        }
++        if (n < 0) {
++          if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
++          spdlog::error("IPC read error: {}", strerror(errno));
++          break;
++        }
++        buffer.append(buf, n);
++
++        std::size_t pos;
++        while ((pos = buffer.find('\n')) != std::string::npos) {
++          std::string line = buffer.substr(0, pos);
++          buffer.erase(0, pos + 1);
++          if (line.empty()) continue;
++          if (line.size() > kMaxIPCFrameSize) {
++            spdlog::warn("Mango monitor IPC frame exceeded {} bytes", kMaxIPCFrameSize);
+@@ -191,12 +310,4 @@ void IPC::startIPC() {
+-          buffer.append(buf, n);
+-
+-          size_t pos;
+-          while ((pos = buffer.find('\n')) != std::string::npos) {
+-            std::string line = buffer.substr(0, pos);
+-            buffer.erase(0, pos + 1);
+-            if (line.empty()) continue;
+-            try {
+-              parseIPC(line);
+-            } catch (const std::exception& e) {
+-              spdlog::warn("Failed to parse IPC line: {} - {}", line, e.what());
+-            }
++          try {
++            parseIPC(line);
++          } catch (const std::exception& e) {
++            spdlog::warn("Failed to parse Mango monitor IPC message: {}", e.what());
+@@ -204,0 +316,4 @@ void IPC::startIPC() {
++        if (buffer.size() > kMaxIPCFrameSize) {
++          spdlog::warn("Mango monitor IPC frame exceeded {} bytes", kMaxIPCFrameSize);
++          connected = false;
++        }
+@@ -207,2 +322 @@ void IPC::startIPC() {
+-      // On shutdown leave the socket for the destructor to close (avoids a
+-      // double close); on a genuine disconnect close it before reconnecting.
++      closeOwnedFd(sockfd_, fd);
+@@ -210,4 +323,0 @@ void IPC::startIPC() {
+-      if (sockfd_ != -1) {
+-        close(sockfd_);
+-        sockfd_ = -1;
+-      }
+@@ -221,0 +332,127 @@ void IPC::startIPC() {
++void IPC::startClientsIPC() {
++  std::call_once(clients_start_once_,
++                 [this]() { clients_ipc_thread_ = std::thread([this]() { runClientsIPC(); }); });
++}
++
++void IPC::startCommandIPC() {
++  std::call_once(command_start_once_,
++                 [this]() { command_ipc_thread_ = std::thread([this]() { runCommandIPC(); }); });
++}
++
++void IPC::runCommandIPC() {
++  while (running_) {
++    PendingCommand pending;
++    {
++      std::unique_lock<std::mutex> lock(command_mutex_);
++      command_condition_.wait(lock, [this]() { return !running_ || !command_queue_.empty(); });
++      if (!running_) break;
++      pending = std::move(command_queue_.front());
++      command_queue_.pop_front();
++    }
++
++    try {
++      IPC::sendCommand(pending.command, pending.id, pending.generation, &command_sockfd_);
++    } catch (const std::exception& e) {
++      spdlog::error("Mango IPC async command failed: {}", e.what());
++    }
++  }
++}
++
++void IPC::enqueueCommand(const std::string& command, ClientId id, std::uint64_t generation) {
++  try {
++    startCommandIPC();
++  } catch (const std::exception& e) {
++    spdlog::error("Failed to start Mango IPC command thread: {}", e.what());
++    return;
++  }
++
++  {
++    std::lock_guard<std::mutex> lock(command_mutex_);
++    if (!running_) return;
++    if (command_queue_.size() >= kMaxPendingCommands) {
++      spdlog::warn("Dropping Mango IPC command: command queue is full");
++      return;
++    }
++    command_queue_.push_back({command, id, generation});
++  }
++  command_condition_.notify_one();
++}
++
++void IPC::runClientsIPC() {
++  spdlog::info("Mango clients IPC thread started");
++  char buf[4096];
++
++  while (running_) {
++    int fd = -1;
++    SocketIdentity socket_identity;
++    try {
++      fd = IPC::connectToSocket(&socket_identity);
++      clients_sockfd_ = fd;
++    } catch (const std::exception& e) {
++      spdlog::error("Mango clients IPC: failed to connect: {}", e.what());
++      std::this_thread::sleep_for(std::chrono::seconds(2));
++      continue;
++    }
++
++    if (!running_) {
++      closeOwnedFd(clients_sockfd_, fd);
++      break;
++    }
++    if (!writeAll(fd, "watch all-clients\n")) {
++      spdlog::error("Failed to subscribe to watch all-clients");
++      closeOwnedFd(clients_sockfd_, fd);
++      std::this_thread::sleep_for(std::chrono::seconds(2));
++      continue;
++    }
++
++    const auto generation = setClientsConnected(socket_identity);
++    struct pollfd pfd = {.fd = fd, .events = POLLIN, .revents = 0};
++    std::string buffer;
++    bool connected = true;
++
++    while (running_ && connected) {
++      const auto ret = poll(&pfd, 1, 1000);
++      if (ret == 0) continue;
++      if (ret < 0) {
++        if (errno == EINTR) continue;
++        spdlog::error("Mango clients IPC poll error: {}", strerror(errno));
++        break;
++      }
++      if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) break;
++      if (!(pfd.revents & POLLIN)) continue;
++
++      const auto n = read(fd, buf, sizeof(buf));
++      if (n == 0) break;
++      if (n < 0) {
++        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
++        spdlog::error("Mango clients IPC read error: {}", strerror(errno));
++        break;
++      }
++      buffer.append(buf, n);
++
++      std::size_t pos;
++      while ((pos = buffer.find('\n')) != std::string::npos) {
++        std::string line = buffer.substr(0, pos);
++        buffer.erase(0, pos + 1);
++        if (line.empty()) continue;
++        if (line.size() > kMaxIPCFrameSize || !parseClientsIPC(line, generation)) {
++          connected = false;
++          break;
++        }
++      }
++      if (buffer.size() > kMaxIPCFrameSize) {
++        spdlog::warn("Mango clients IPC frame exceeded {} bytes", kMaxIPCFrameSize);
++        connected = false;
++      }
++    }
++
++    closeOwnedFd(clients_sockfd_, fd);
++    if (!running_) break;
++    setClientsDisconnected(generation);
++    spdlog::warn("Mango clients IPC stream closed, reconnecting");
++    std::this_thread::sleep_for(std::chrono::seconds(2));
++  }
++
++  spdlog::info("Mango clients IPC thread stopping");
++}
++
+@@ -232,3 +469 @@ void IPC::parseIPC(const std::string& line) {
+-    for (const auto& mon : root["monitors"]) {
+-      handleMonitorUpdate(mon);
+-    }
++    for (const auto& mon : root["monitors"]) handleMonitorUpdate(mon);
+@@ -251 +485,0 @@ void IPC::parseIPC(const std::string& line) {
+-
+@@ -258,9 +492 @@ void IPC::parseIPC(const std::string& line) {
+-    {
+-      std::lock_guard<std::mutex> lock(callback_mutex_);
+-      for (auto& [ev, handler] : callbacks_) {
+-        if (ev == "monitor") {
+-          handler->onEvent(root);
+-        }
+-      }
+-    }
+-
++    notify("monitor", root);
+@@ -272,0 +499,63 @@ void IPC::parseIPC(const std::string& line) {
++bool IPC::parseClientsIPC(const std::string& line, std::uint64_t generation) {
++  Json::Value root;
++  Json::CharReaderBuilder builder;
++  std::string errors;
++  std::istringstream iss(line);
++  if (!Json::parseFromStream(builder, iss, &root, &errors)) {
++    spdlog::warn("Failed to parse Mango clients IPC JSON: {}", errors);
++    return false;
++  }
++
++  auto parsed = parseClientSnapshot(root, generation, &errors);
++  if (!parsed) {
++    spdlog::warn("Rejected Mango clients IPC snapshot: {}", errors);
++    return false;
++  }
++
++  auto snapshot = std::make_shared<ClientSnapshot>(std::move(*parsed));
++  {
++    std::lock_guard<std::mutex> lock(client_cache_mutex_);
++    if (client_cache_.generation != generation || !client_cache_.connected) return false;
++    client_cache_.snapshot = std::move(snapshot);
++    client_cache_.fresh = true;
++  }
++  notify("clients", root);
++  return true;
++}
++
++std::uint64_t IPC::setClientsConnected(const SocketIdentity& identity) {
++  std::uint64_t generation;
++  {
++    std::lock_guard<std::mutex> lock(client_cache_mutex_);
++    generation = ++client_cache_.generation;
++    client_cache_.connected = true;
++    client_cache_.fresh = false;
++    clients_socket_identity_ = identity;
++  }
++  notify("clients");
++  return generation;
++}
++
++void IPC::setClientsDisconnected(std::uint64_t generation) {
++  {
++    std::lock_guard<std::mutex> lock(client_cache_mutex_);
++    if (client_cache_.generation != generation) return;
++    client_cache_.connected = false;
++    client_cache_.fresh = false;
++  }
++  notify("clients");
++}
++
++bool IPC::clientCommandActionable(ClientId id, std::uint64_t generation,
++                                  const SocketIdentity& identity) const {
++  std::lock_guard<std::mutex> lock(client_cache_mutex_);
++  return clients_socket_identity_ == identity && client_cache_.actionable(id, generation);
++}
++
++void IPC::notify(const std::string& event, const Json::Value& payload) {
++  std::lock_guard<std::mutex> lock(callback_mutex_);
++  for (auto& [registered_event, handler] : callbacks_) {
++    if (registered_event == event) handler->onEvent(payload);
++  }
++}
++
+@@ -286,3 +575 @@ Json::Value IPC::getMonitor(const std::string& name) {
+-  if (it != monitors_.end()) {
+-    return it->second;
+-  }
++  if (it != monitors_.end()) return it->second;
+@@ -319,0 +607,5 @@ std::string IPC::getLayoutSymbolForMonitor(const std::string& name) const {
++ClientCache IPC::getClientCache() const {
++  std::lock_guard<std::mutex> lock(client_cache_mutex_);
++  return client_cache_;
++}
++
+@@ -326,10 +618,8 @@ void IPC::updateFocusingClient(const Json::Value& client) {
+-  {
+-    std::lock_guard<std::mutex> lock(data_mutex_);
+-    active_client_ = client;
+-
+-    if (client.isNull() || !client.isObject() || client["id"].isNull()) {
+-      focusing_client_id_ = 0;
+-    } else {
+-      focusing_client_id_ = client["id"].asUInt64();
+-      clients_[focusing_client_id_] = client;
+-    }
++  std::lock_guard<std::mutex> lock(data_mutex_);
++  active_client_ = client;
++
++  if (client.isNull() || !client.isObject() || client["id"].isNull()) {
++    focusing_client_id_ = 0;
++  } else {
++    focusing_client_id_ = client["id"].asUInt64();
++    clients_[focusing_client_id_] = client;
+@@ -340,4 +630,2 @@ void IPC::updateKeyboardLayout(const std::string& layout) {
+-  {
+-    std::lock_guard<std::mutex> lock(data_mutex_);
+-    keyboard_layout_ = layout;
+-  }
++  std::lock_guard<std::mutex> lock(data_mutex_);
++  keyboard_layout_ = layout;
+@@ -347,0 +636,4 @@ void IPC::registerForIPC(const std::string& ev, EventHandler* handler) {
++  // Start a potentially-throwing worker before publishing the raw callback.
++  // The current cache is authoritative if the initial snapshot arrives before
++  // registration, and the module schedules an update immediately afterwards.
++  if (ev == "clients") startClientsIPC();
+@@ -363 +655 @@ void IPC::unregisterForIPC(EventHandler* handler) {
+-}  // namespace waybar::modules::mango
+\ No newline at end of file
++}  // namespace waybar::modules::mango
+diff --git a/src/modules/mango/taskbar.cpp b/src/modules/mango/taskbar.cpp
+new file mode 100644
+index 0000000..269baba
+--- /dev/null
++++ b/src/modules/mango/taskbar.cpp
+@@ -0,0 +1,259 @@
++#include "modules/mango/taskbar.hpp"
++
++#include <fmt/format.h>
++#include <spdlog/spdlog.h>
++
++#include <algorithm>
++#include <unordered_set>
++
++#include "util/rewrite_string.hpp"
++
++namespace waybar::modules::mango {
++
++Taskbar::Taskbar(const std::string& id, const Bar& bar, const Json::Value& config)
++    : AModule(config, "taskbar", id, false, false), bar_(bar), box_(bar.orientation, 0) {
++  box_.set_name("taskbar");
++  if (!id.empty()) box_.get_style_context()->add_class(id);
++  box_.get_style_context()->add_class(MODULE_CLASS);
++  box_.get_style_context()->add_class("empty");
++  box_.get_style_context()->add_class("disconnected");
++  event_box_.add(box_);
++
++  if (config_["all-outputs"].isBool()) all_outputs_ = config_["all-outputs"].asBool();
++  if (config_["format"].isString()) format_ = config_["format"].asString();
++  if (config_["tooltip-format"].isString()) {
++    tooltip_format_ = config_["tooltip-format"].asString();
++  }
++  if (config_["on-click"].isString()) on_click_left_ = config_["on-click"].asString();
++  if (config_["on-click-middle"].isString()) {
++    on_click_middle_ = config_["on-click-middle"].asString();
++  }
++  if (config_["on-click-right"].isString()) {
++    on_click_right_ = config_["on-click-right"].asString();
++  }
++
++  const auto is_builtin_action = [](const std::string& action) {
++    return action == "activate" || action == "close" || action == "minimize";
++  };
++  for (const auto* event : {"on-click", "on-click-middle", "on-click-right"}) {
++    if (config_[event].isString() && is_builtin_action(config_[event].asString())) {
++      eventActionMap_.insert({event, config_[event].asString()});
++    }
++  }
++
++  IPC::getInstance().registerForIPC("clients", this);
++  dp.emit();
++}
++
++Taskbar::~Taskbar() {
++  IPC::getInstance().unregisterForIPC(this);
++  clearTasks();
++}
++
++void Taskbar::onEvent(const Json::Value& event) { dp.emit(); }
++
++void Taskbar::update() {
++  reconcile(IPC::getInstance().getClientCache());
++  AModule::update();
++}
++
++void Taskbar::reconcile(const ClientCache& cache) {
++  const bool fresh = cache.connected && cache.fresh && cache.snapshot &&
++                     cache.snapshot->generation == cache.generation;
++  setClass(box_.get_style_context(), "disconnected", !fresh);
++
++  if (!cache.snapshot) {
++    setClass(box_.get_style_context(), "empty", true);
++    return;
++  }
++
++  // Keep the previous generation visible but inert while reconnecting. Numeric
++  // Mango IDs may be reused after a compositor restart, so only reconcile once
++  // a complete snapshot for the new generation has arrived.
++  if (cache.snapshot->generation != cache.generation) {
++    for (auto& [id, task] : tasks_) task->button.set_sensitive(false);
++    return;
++  }
++
++  if (rendered_generation_ != cache.generation) {
++    clearTasks();
++    rendered_generation_ = cache.generation;
++  }
++
++  std::unordered_set<ClientId> present;
++  present.reserve(cache.snapshot->clients.size());
++  std::size_t visible_count = 0;
++
++  for (const auto& client : cache.snapshot->clients) {
++    present.insert(client.id);
++    auto it = tasks_.find(client.id);
++    auto& task = it == tasks_.end() ? addTask(client.id, cache.generation) : *it->second;
++    updateTask(task, client, cache.actionable(client.id, task.generation));
++
++    const bool visible = client.visible && (all_outputs_ || client.monitor == bar_.output->name);
++    if (visible) {
++      task.button.show_all();
++      ++visible_count;
++    } else {
++      task.button.hide();
++    }
++  }
++
++  for (auto it = tasks_.begin(); it != tasks_.end();) {
++    if (!present.contains(it->first)) {
++      box_.remove(it->second->button);
++      it = tasks_.erase(it);
++    } else {
++      ++it;
++    }
++  }
++
++  int position = 0;
++  for (const auto& client : cache.snapshot->clients) {
++    box_.reorder_child(tasks_.at(client.id)->button, position++);
++  }
++  setClass(box_.get_style_context(), "empty", visible_count == 0);
++}
++
++Taskbar::Task& Taskbar::addTask(ClientId id, std::uint64_t generation) {
++  auto task = std::make_unique<Task>(id, generation);
++  auto& result = *task;
++
++  result.button.set_relief(Gtk::RELIEF_NONE);
++  result.button.set_hexpand(true);
++  result.label.set_halign(Gtk::ALIGN_FILL);
++  result.label.set_hexpand(true);
++  result.label.set_single_line_mode(true);
++
++  float alignment = 0.5F;
++  if (config_["justify"].isString()) {
++    const auto justify = config_["justify"].asString();
++    if (justify == "left")
++      alignment = 0.0F;
++    else if (justify == "right")
++      alignment = 1.0F;
++    else if (justify != "center")
++      spdlog::warn("Invalid mango/taskbar justify: expected left, center, or right");
++  }
++  result.label.set_xalign(alignment);
++
++  if (config_["truncate"].isBool() && config_["truncate"].asBool()) {
++    result.label.set_line_wrap(false);
++    result.label.set_ellipsize(Pango::ELLIPSIZE_END);
++  }
++
++  result.button.add(result.label);
++  result.button.add_events(Gdk::BUTTON_RELEASE_MASK);
++  result.button.signal_button_release_event().connect(
++      [this, id](GdkEventButton* event) { return handleButtonClick(event, id); }, false);
++  box_.pack_start(result.button, false, false, 0);
++
++  const auto insertion = tasks_.emplace(id, std::move(task));
++  return *insertion.first->second;
++}
++
++void Taskbar::clearTasks() {
++  for (auto& [id, task] : tasks_) box_.remove(task->button);
++  tasks_.clear();
++}
++
++void Taskbar::updateTask(Task& task, const ClientInfo& client, bool actionable) {
++  auto text = formatText(format_, client);
++  text = waybar::util::rewriteString(text, config_["rewrite"]);
++  if (config_["markup"].isBool() && config_["markup"].asBool())
++    task.label.set_markup(text);
++  else
++    task.label.set_text(text);
++
++  if (tooltipEnabled()) {
++    auto tooltip = formatText(tooltip_format_, client);
++    tooltip = waybar::util::rewriteString(tooltip, config_["rewrite"]);
++    if (config_["markup"].isBool() && config_["markup"].asBool())
++      task.button.set_tooltip_markup(tooltip);
++    else
++      task.button.set_tooltip_text(tooltip);
++  } else {
++    task.button.set_has_tooltip(false);
++  }
++
++  const auto style = task.button.get_style_context();
++  setClass(style, "active", client.focused);
++  setClass(style, "urgent", client.urgent);
++  setClass(style, "minimized", client.minimized);
++  setClass(style, "maximized", client.maximized);
++  setClass(style, "fullscreen", client.fullscreen);
++  task.button.set_sensitive(actionable);
++
++  const auto accessible = task.button.get_accessible();
++  if (accessible) accessible->set_name(client.title);
++}
++
++bool Taskbar::handleButtonClick(GdkEventButton* event, ClientId id) {
++  std::string action;
++  if (event->button == 1)
++    action = on_click_left_;
++  else if (event->button == 2)
++    action = on_click_middle_;
++  else if (event->button == 3)
++    action = on_click_right_;
++
++  auto task = tasks_.find(id);
++  const auto cache = IPC::getInstance().getClientCache();
++  if (task == tasks_.end() || !cache.actionable(id, task->second->generation)) return true;
++
++  std::string command;
++  if (action == "activate")
++    command = fmt::format("dispatch focusid client,{}", id);
++  else if (action == "close")
++    command = fmt::format("dispatch killclient client,{}", id);
++  else if (action == "minimize")
++    command = fmt::format("dispatch minimized client,{}", id);
++  else
++    return false;
++
++  Json::Value request;
++  request["command"] = command;
++  IPC::getInstance().sendClientCommandAsync(request, id, task->second->generation);
++  return true;
++}
++
++std::string Taskbar::formatText(const std::string& format, const ClientInfo& client) const {
++  const bool markup = config_["markup"].isBool() && config_["markup"].asBool();
++  const std::string title = markup ? Glib::Markup::escape_text(client.title).raw() : client.title;
++  const std::string app_id =
++      markup ? Glib::Markup::escape_text(client.app_id).raw() : client.app_id;
++
++  try {
++    return fmt::format(fmt::runtime(format), fmt::arg("title", title), fmt::arg("app_id", app_id),
++                       fmt::arg("id", client.id), fmt::arg("state", stateString(client)));
++  } catch (const fmt::format_error& error) {
++    spdlog::warn("Failed to format mango/taskbar text '{}': {}", format, error.what());
++    return title;
++  }
++}
++
++std::string Taskbar::stateString(const ClientInfo& client) {
++  std::string state;
++  for (const auto& [enabled, name] : {
++           std::pair{client.minimized, "minimized"},
++           std::pair{client.maximized, "maximized"},
++           std::pair{client.focused, "active"},
++           std::pair{client.fullscreen, "fullscreen"},
++           std::pair{client.urgent, "urgent"},
++       }) {
++    if (!enabled) continue;
++    if (!state.empty()) state += ' ';
++    state += name;
++  }
++  return state;
++}
++
++void Taskbar::setClass(const Glib::RefPtr<Gtk::StyleContext>& style, const std::string& name,
++                       bool enabled) {
++  if (enabled)
++    style->add_class(name);
++  else
++    style->remove_class(name);
++}
++
++}  // namespace waybar::modules::mango
+diff --git a/test/smoke/coverage.sh b/test/smoke/coverage.sh
+index 9969d67..a159345 100755
+--- a/test/smoke/coverage.sh
++++ b/test/smoke/coverage.sh
+@@ -33 +33 @@ COMPOSITOR=(sway/language sway/mode sway/scratchpad sway/window sway/workspaces
+-            mango/keymode mango/language mango/layout mango/window mango/workspaces
++            mango/keymode mango/language mango/layout mango/taskbar mango/window mango/workspaces
