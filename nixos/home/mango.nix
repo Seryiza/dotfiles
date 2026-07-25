@@ -1,26 +1,28 @@
 { mango }:
-{
-  nixosModule =
-    { pkgs, ... }:
-    let
+let
+  mangoPackageFor =
+    pkgs:
+    pkgs.symlinkJoin {
+      name = "mango-without-plain-session";
+      paths = [ mango.packages.${pkgs.stdenv.hostPlatform.system}.mango ];
       # UWSM links all packages' Wayland session entries into the display
       # manager's session directory. Remove Mango's plain `Exec=mango` entry so
       # sysc-greet cannot bypass the UWSM-managed session.
-      mangoPackage = pkgs.symlinkJoin {
-        name = "mango-without-plain-session";
-        paths = [ mango.packages.${pkgs.stdenv.hostPlatform.system}.mango ];
-        postBuild = ''
-          rm -f $out/share/wayland-sessions/mango.desktop
-        '';
-      };
-    in
+      postBuild = ''
+        rm -f $out/share/wayland-sessions/mango.desktop
+      '';
+    };
+in
+{
+  nixosModule =
+    { pkgs, ... }:
     {
       imports = [ mango.nixosModules.mango ];
 
       programs.mango = {
         enable = true;
         addLoginEntry = false;
-        package = mangoPackage;
+        package = mangoPackageFor pkgs;
       };
 
       programs.uwsm.waylandCompositors.mango = {
@@ -37,6 +39,7 @@
 
       wayland.windowManager.mango = {
         enable = true;
+        package = mangoPackageFor pkgs;
         settings = {
           exec-once = [
             "uwsm finalize"
@@ -45,8 +48,8 @@
 
           monitorrule = "name:^eDP-1$,width:2560,height:1600,refresh:240,x:0,y:0,scale:2";
 
-          # Mango assigns layouts per tag. Make scroller the initial layout on every tag.
-          tagrule = map (tag: "id:${toString tag},layout_name:scroller") (
+          # Mango assigns layouts per tag. Make monocle the initial layout on every tag.
+          tagrule = map (tag: "id:${toString tag},layout_name:monocle") (
             builtins.genList (index: index + 1) 9
           );
           circle_layout = "scroller,tile,monocle";
@@ -61,10 +64,10 @@
           scroller_structs = 40;
           scroller_proportion_preset = "0.5,0.75,1.0";
 
-          gappih = 10;
-          gappiv = 10;
-          gappoh = 10;
-          gappov = 10;
+          gappih = 6;
+          gappiv = 6;
+          gappoh = 6;
+          gappov = 6;
           borderpx = 3;
           rootcolor = "0xffffffff";
           bordercolor = "0xd3d3d3ff";
@@ -96,8 +99,8 @@
             "SUPER,Tab,toggleoverview"
             "SUPER+SHIFT,Tab,togglejump"
             "SUPER,bracketleft,switch_layout"
-            "SUPER,h,focusdir,left"
-            "SUPER,l,focusdir,right"
+            "SUPER,j,focusstack,next"
+            "SUPER,k,focusstack,prev"
             "SUPER+ALT,l,viewtoright,0"
             "SUPER+ALT,h,viewtoleft,0"
             "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
