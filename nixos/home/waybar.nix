@@ -38,7 +38,10 @@ in
         position = "right";
         width = 250;
         spacing = 0;
-        modules-right-halign = "start";
+        modules-right-halign = {
+          default = "start";
+          tray = "fill";
+        };
         modules-left = [
           "mango/workspaces"
           "mango/taskbar"

@@ -1,46 +1,58 @@
 diff --git a/man/waybar.5.scd.in b/man/waybar.5.scd.in
-index ff2af1b..0677966 100644
+index ff2af1b..a495592 100644
 --- a/man/waybar.5.scd.in
 +++ b/man/waybar.5.scd.in
-@@ -81,0 +82,6 @@ The visual display elements for waybar use a CSS stylesheet. Waybar supports *st
+@@ -81,0 +82,7 @@ The visual display elements for waybar use a CSS stylesheet. Waybar supports *st
 +*modules-right-halign* ++
-+	typeof: string ++
++	typeof: string|object ++
 +	default: fill ++
-+	Sets the horizontal alignment of each module in *modules-right*. ++
-+	Possible values are *start*, *center*, *end*, and *fill*.
++	Sets the horizontal alignment of modules in *modules-right*. ++
++	Possible values are *start*, *center*, *end*, and *fill*. An object can set a ++
++	*default* alignment and override it by exact module name.
 +
 diff --git a/src/bar.cpp b/src/bar.cpp
-index ec3189c..3e8ffc2 100644
+index ec3189c..4ccdd97 100644
 --- a/src/bar.cpp
 +++ b/src/bar.cpp
-@@ -673,0 +674,23 @@ auto waybar::Bar::setupWidgets() -> void {
-+  bool apply_right_halign = false;
-+  Gtk::Align right_halign = Gtk::ALIGN_FILL;
-+  const auto& right_halign_config = config["modules-right-halign"];
-+  if (right_halign_config.isString()) {
-+    const auto value = right_halign_config.asString();
-+    if (value == "start") {
-+      right_halign = Gtk::ALIGN_START;
-+      apply_right_halign = true;
-+    } else if (value == "center") {
-+      right_halign = Gtk::ALIGN_CENTER;
-+      apply_right_halign = true;
-+    } else if (value == "end") {
-+      right_halign = Gtk::ALIGN_END;
-+      apply_right_halign = true;
-+    } else if (value == "fill") {
-+      apply_right_halign = true;
-+    } else {
-+      spdlog::warn("Invalid modules-right-halign: expected start, center, end, or fill");
-+    }
-+  } else if (!right_halign_config.isNull()) {
-+    spdlog::warn("Invalid modules-right-halign: expected a string");
+@@ -569,0 +570,24 @@ waybar::util::KillSignalAction waybar::Bar::getOnSigusr2Action() { return this->
++static void applyModuleHalign(Gtk::Widget& widget, const Json::Value& config,
++                              const std::string& option) {
++  if (config.isNull()) {
++    return;
++  }
++  if (!config.isString()) {
++    spdlog::warn("Invalid {}: expected start, center, end, or fill", option);
++    return;
 +  }
 +
-@@ -676 +699,5 @@ auto waybar::Bar::setupWidgets() -> void {
--    right_.pack_end(*module, module->expandEnabled(), module->expandEnabled());
-+    Gtk::Widget& widget = *module;
-+    if (apply_right_halign) {
-+      widget.set_halign(right_halign);
-+    }
-+    right_.pack_end(widget, module->expandEnabled(), module->expandEnabled());
++  const auto value = config.asString();
++  if (value == "start") {
++    widget.set_halign(Gtk::ALIGN_START);
++  } else if (value == "center") {
++    widget.set_halign(Gtk::ALIGN_CENTER);
++  } else if (value == "end") {
++    widget.set_halign(Gtk::ALIGN_END);
++  } else if (value == "fill") {
++    widget.set_halign(Gtk::ALIGN_FILL);
++  } else {
++    spdlog::warn("Invalid {}: expected start, center, end, or fill", option);
++  }
++}
++
+@@ -604,0 +629,16 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
++        if (group == nullptr && pos == "modules-right") {
++          const auto& right_halign = config["modules-right-halign"];
++          Gtk::Widget& widget = *module;
++          if (right_halign.isObject()) {
++            const auto& module_halign = right_halign[ref];
++            if (module_halign.isNull()) {
++              applyModuleHalign(widget, right_halign["default"],
++                                "modules-right-halign.default");
++            } else {
++              applyModuleHalign(widget, module_halign, "modules-right-halign." + ref);
++            }
++          } else {
++            applyModuleHalign(widget, right_halign, "modules-right-halign");
++          }
++        }
++

@@ -1,9 +1,9 @@
 diff --git a/test/mango.cpp b/test/mango.cpp
 new file mode 100644
-index 0000000..9f00a2e
+index 0000000..16b6dfc
 --- /dev/null
 +++ b/test/mango.cpp
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,228 @@
 +#if __has_include(<catch2/catch_test_macros.hpp>)
 +#include <catch2/catch_test_macros.hpp>
 +#else
@@ -26,7 +26,7 @@ index 0000000..9f00a2e
 +Json::Value makeClient(Json::UInt64 id, const std::string& title = "Terminal",
 +                       const std::string& app_id = "Alacritty",
 +                       const std::string& monitor = "eDP-1", bool visible = true,
-+                       bool focused = false) {
++                       bool focused = false, bool urgent = false) {
 +  Json::Value client(Json::objectValue);
 +  client["id"] = id;
 +  client["title"] = title;
@@ -37,7 +37,7 @@ index 0000000..9f00a2e
 +  client["is_fullscreen"] = false;
 +  client["is_maximized"] = false;
 +  client["is_minimized"] = false;
-+  client["is_urgent"] = false;
++  client["is_urgent"] = urgent;
 +  return client;
 +}
 +
@@ -96,6 +96,22 @@ index 0000000..9f00a2e
 +          std::vector<mango::ClientId>{10, 30});
 +}
 +
++TEST_CASE("Mango taskbar preserves urgency transitions", "[mango][taskbar]") {
++  auto calm = makeClient(42);
++  auto urgent = calm;
++  urgent["is_urgent"] = true;
++  auto cleared = urgent;
++  cleared["is_urgent"] = false;
++
++  const auto before = parsedSnapshot(makeSnapshot({calm}), 4);
++  const auto during = parsedSnapshot(makeSnapshot({urgent}), 4);
++  const auto after = parsedSnapshot(makeSnapshot({cleared}), 4);
++
++  REQUIRE_FALSE(before->clients[0].urgent);
++  REQUIRE(during->clients[0].urgent);
++  REQUIRE_FALSE(after->clients[0].urgent);
++}
++
 +TEST_CASE("Mango client snapshots validate identity and required fields", "[mango][taskbar]") {
 +  SECTION("an empty snapshot is authoritative") {
 +    const auto snapshot = mango::parseClientSnapshot(makeSnapshot({}), 8);
@@ -136,6 +152,10 @@ index 0000000..9f00a2e
 +    auto wrong_type = makeClient(5);
 +    wrong_type["is_visible"] = "yes";
 +    REQUIRE_FALSE(mango::parseClientSnapshot(makeSnapshot({wrong_type}), 1).has_value());
++
++    auto wrong_urgency = makeClient(5);
++    wrong_urgency["is_urgent"] = "yes";
++    REQUIRE_FALSE(mango::parseClientSnapshot(makeSnapshot({wrong_urgency}), 1).has_value());
 +  }
 +
 +  SECTION("the root must contain an array") {
