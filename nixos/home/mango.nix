@@ -105,6 +105,8 @@ in
             "SUPER+ALT,k,exchange_stack_client,prev"
             "SUPER,l,viewtoright,0"
             "SUPER,h,viewtoleft,0"
+            "SUPER+ALT,l,tagtoright,0"
+            "SUPER+ALT,h,tagtoleft,0"
             "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER+ALT,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER,m,spawn,emacsclient -c"
