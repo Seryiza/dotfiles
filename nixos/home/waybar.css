@@ -1,12 +1,12 @@
 * {
     font-family: FontAwesome, Iosevka, Roboto, Helvetica, Arial, sans-serif;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 window#waybar {
-    background-color: #000000;
+    background-color: #FFFFFF;
     border-bottom: 0;
-    color: #ffffff;
+    color: #000000;
     min-height: 20px;
     transition-property: background-color;
     transition-duration: .5s;
@@ -26,12 +26,18 @@ window#waybar.hidden {
     padding: 0;
 }
 
+/* Keep the last vertical status module on the same left inset as its peers. */
+window#waybar.right .modules-right > widget:last-child {
+    padding: 0 10px;
+}
+
 /*
 window#waybar.empty {
     background-color: transparent;
 
 window#waybar.solo {
-    background-color: #FFFFFF;
+    background-color: #000000;
+    color: #FFFFFF;
 }
 */
 
@@ -45,8 +51,8 @@ window#waybar.chromium {
 }
 
 button {
-    background-color: #000000;
-    color: #ffffff;
+    background-color: #FFFFFF;
+    color: #000000;
     min-height: 0;
     margin-top: 0;
     margin-bottom: 0;
@@ -59,8 +65,6 @@ button {
 
 /* https://github.com/Alexays/Waybar/wiki/FAQ#the-workspace-buttons-have-a-strange-hover-effect */
 button:hover {
-    background-color: #ffffff;
-    color: #000000;
     box-shadow: inherit;
     text-shadow: inherit;
 }
@@ -77,26 +81,22 @@ button:hover {
     padding: 0 4px;
 }
 
-#workspaces button:hover,
-#workspaces button.focused,
-#workspaces button.active {
-    background-color: #ffffff;
+button {
+    background-color: #FFFFFF;
     color: #000000;
+    padding: 2px 4px;
+}
+
+button:hover,
+button.focused,
+button.active {
+    background-color: #000000;
+    color: #FFFFFF;
 }
 
 #workspaces button.urgent {
     background-color: #eb4d4b;
     color: #ffffff;
-}
-
-#taskbar button {
-    color: #ffffff;
-    padding: 2px 4px;
-}
-
-#taskbar button.active {
-    background-color: #ffffff;
-    color: #000000;
 }
 
 #taskbar.disconnected button {
@@ -121,8 +121,10 @@ button:hover {
 #custom-media,
 #custom-org_timeblock,
 #custom-org_clock,
+#custom-wireguard,
 #sway-language,
 #language,
+#privacy,
 #tray,
 #mode,
 #idle_inhibitor,
@@ -130,7 +132,10 @@ button:hover {
 #power-profiles-daemon,
 #mpd {
     padding: 0 10px;
-    color: #ffffff;
+    color: #000000;
+}
+
+#tray {
 }
 
 /* #sway-language { */
@@ -215,4 +220,8 @@ label:focus {
     margin: 0;
     color: #000000;
     background-color: #ffffff;
+}
+
+window#waybar.right #privacy-item {
+    padding: 0;
 }
