@@ -245,7 +245,10 @@ in {
   # Enable CUPS to print documents.
   services.printing.enable = true;
 
-  services.tailscale.enable = true;
+  services.tailscale = {
+    enable = true;
+    package = unstable-pkgs.tailscale;
+  };
 
   services.searx = {
     enable = true;
