@@ -228,8 +228,17 @@ in {
 
   environment.variables = { QT_QPA_PLATFORM = "wayland"; };
 
-  environment.sessionVariables.NIXOS_OZONE_WL = "1";
-  environment.sessionVariables.BROWSER = "firefox";
+  environment.sessionVariables = {
+    NIXOS_OZONE_WL = "1";
+    BROWSER = "firefox";
+
+    # Work around missing GSettings schemas in Firefox's wrapper.
+    # https://github.com/NixOS/nixpkgs/issues/546204
+    XDG_DATA_DIRS = [
+      "${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}"
+      "${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}"
+    ];
+  };
 
   virtualisation.docker.enable = true;
   virtualisation.docker.rootless = {
