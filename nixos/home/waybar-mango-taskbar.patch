@@ -71,15 +71,16 @@ index 7e4313f..89b0b76 100644
 +  std::deque<PendingCommand> command_queue_;
 diff --git a/include/modules/mango/taskbar.hpp b/include/modules/mango/taskbar.hpp
 new file mode 100644
-index 0000000..98a9913
+index 0000000..54f2a3f
 --- /dev/null
 +++ b/include/modules/mango/taskbar.hpp
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,68 @@
 +#pragma once
 +
 +#include <gtkmm/box.h>
 +#include <gtkmm/button.h>
 +#include <gtkmm/label.h>
++#include <gtkmm/overlay.h>
 +#include <json/value.h>
 +
 +#include <cstdint>
@@ -101,11 +102,19 @@ index 0000000..98a9913
 +
 + private:
 +  struct Task {
-+    Task(ClientId id, std::uint64_t generation) : id(id), generation(generation) {}
++    Task(ClientId id, std::uint64_t generation)
++        : id(id),
++          generation(generation),
++          app_label_sizer(Gtk::ORIENTATION_HORIZONTAL, 0),
++          content(Gtk::ORIENTATION_HORIZONTAL, 0) {}
 +
 +    ClientId id;
 +    std::uint64_t generation;
-+    Gtk::Label label;
++    Gtk::Label title_label;
++    Gtk::Box app_label_sizer;
++    Gtk::Label app_label;
++    Gtk::Overlay app_label_slot;
++    Gtk::Box content;
 +    Gtk::Button button;
 +  };
 +
@@ -125,6 +134,7 @@ index 0000000..98a9913
 +  std::unordered_map<ClientId, std::unique_ptr<Task>> tasks_;
 +  std::uint64_t rendered_generation_ = 0;
 +  bool all_outputs_ = false;
++  TaskbarOptions options_;
 +  std::string format_ = "{title}";
 +  std::string tooltip_format_ = "{title}";
 +  std::string on_click_left_;
@@ -135,10 +145,10 @@ index 0000000..98a9913
 +}  // namespace waybar::modules::mango
 diff --git a/include/modules/mango/taskbar_model.hpp b/include/modules/mango/taskbar_model.hpp
 new file mode 100644
-index 0000000..ece947e
+index 0000000..9babdf7
 --- /dev/null
 +++ b/include/modules/mango/taskbar_model.hpp
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,165 @@
 +#pragma once
 +
 +#include <json/value.h>
@@ -155,6 +165,53 @@ index 0000000..ece947e
 +namespace waybar::modules::mango {
 +
 +using ClientId = std::uint32_t;
++
++struct TaskbarOptions {
++  std::unordered_map<std::string, std::string> app_labels;
++  bool app_labels_invalid = false;
++  bool app_labels_type_invalid = false;
++  std::vector<std::string> invalid_app_label_entries;
++  int app_label_width = 0;
++  bool app_label_width_invalid = false;
++};
++
++inline TaskbarOptions parseTaskbarOptions(const Json::Value& config) {
++  TaskbarOptions options;
++
++  const auto& app_labels = config["app-labels"];
++  if (app_labels.isObject()) {
++    for (const auto& app_id : app_labels.getMemberNames()) {
++      if (app_labels[app_id].isString()) {
++        options.app_labels.emplace(app_id, app_labels[app_id].asString());
++      } else {
++        options.app_labels_invalid = true;
++        options.invalid_app_label_entries.push_back(app_id);
++      }
++    }
++  } else if (!app_labels.isNull()) {
++    options.app_labels_invalid = true;
++    options.app_labels_type_invalid = true;
++  }
++
++  const auto& app_label_width = config["app-label-width"];
++  if (app_label_width.isInt64() && app_label_width.asInt64() >= 0 &&
++      app_label_width.asInt64() <= std::numeric_limits<int>::max()) {
++    options.app_label_width = static_cast<int>(app_label_width.asInt64());
++  } else if (app_label_width.isUInt64() &&
++             app_label_width.asUInt64() <=
++                 static_cast<Json::UInt64>(std::numeric_limits<int>::max())) {
++    options.app_label_width = static_cast<int>(app_label_width.asUInt64());
++  } else if (!app_label_width.isNull()) {
++    options.app_label_width_invalid = true;
++  }
++
++  return options;
++}
++
++inline std::string appLabelFor(const TaskbarOptions& options, const std::string& app_id) {
++  const auto match = options.app_labels.find(app_id);
++  return match == options.app_labels.end() ? std::string{} : match->second;
++}
 +
 +struct ClientInfo {
 +  ClientId id = 0;
@@ -259,10 +316,10 @@ index 0000000..ece947e
 +}  // namespace waybar::modules::mango
 diff --git a/man/waybar-mango-taskbar.5.scd b/man/waybar-mango-taskbar.5.scd
 new file mode 100644
-index 0000000..510616f
+index 0000000..6a005e0
 --- /dev/null
 +++ b/man/waybar-mango-taskbar.5.scd
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,131 @@
 +waybar-mango-taskbar(5)
 +
 +# NAME
@@ -271,7 +328,7 @@ index 0000000..510616f
 +
 +# DESCRIPTION
 +
-+The *mango/taskbar* module displays Mango clients visible on the selected tags. Client identity and ordering come directly from Mango's *watch all-clients* IPC snapshots, so windows with identical titles and application IDs remain distinct.
++The *mango/taskbar* module displays Mango clients visible on the selected tags. Client identity and ordering come directly from Mango's *watch all-clients* IPC snapshots, so windows with identical titles and application IDs remain distinct. Optional application labels are display-only and do not participate in client identity.
 +
 +# CONFIGURATION
 +
@@ -280,31 +337,41 @@ index 0000000..510616f
 +*format*: ++
 +	typeof: string ++
 +	default: {title} ++
-+	The format for each client button. See *FORMAT REPLACEMENTS*.
++	The format for each client button's title region. See *FORMAT REPLACEMENTS*.
 +
 +*all-outputs*: ++
 +	typeof: bool ++
 +	default: false ++
 +	If false, only visible clients on the bar's output are shown. If true, visible clients from every output are shown.
 +
++*app-labels*: ++
++	typeof: object ++
++	default: {} ++
++	Maps exact, case-sensitive raw Mango *appid* strings to literal labels displayed in the right application-label slot. Unmatched application IDs produce an empty label. Application labels are not processed by *format*, *rewrite*, or *markup*, and do not participate in client identity.
++
++*app-label-width*: ++
++	typeof: integer ++
++	default: 0 ++
++	Sets the non-negative width of the right application-label slot in GTK pixels. Zero disables the visual slot. A positive width remains reserved when an application's ID is unmatched, and label glyphs do not enlarge it. Labels wider than the slot are ellipsized.
++
 +*justify*: ++
 +	typeof: string ++
 +	default: center ++
-+	The button-label alignment. Supported values are *left*, *center*, and *right*.
++	The title-region alignment. Supported values are *left*, *center*, and *right*.
 +
 +*truncate*: ++
 +	typeof: bool ++
 +	default: false ++
-+	Ellipsizes labels that do not fit in the available space.
++	Ellipsizes title-region labels that do not fit in the available space.
 +
 +*markup*: ++
 +	typeof: bool ++
 +	default: false ++
-+	If true, formatted labels and tooltips are interpreted as Pango markup. Client-provided fields are escaped before formatting.
++	If true, formatted title-region labels and tooltips are interpreted as Pango markup. Client-provided fields are escaped before formatting. Application labels always remain literal text.
 +
 +*rewrite*: ++
 +	typeof: object ++
-+	Rules for rewriting formatted labels and tooltips.
++	Rules for rewriting formatted title-region labels and tooltips. Application labels are excluded.
 +
 +*tooltip*: ++
 +	typeof: bool ++
@@ -361,6 +428,10 @@ index 0000000..510616f
 +	"format": "{title}",
 +	"justify": "left",
 +	"truncate": true,
++	"app-labels": {
++		"org.example.Editor": "ED"
++	},
++	"app-label-width": 28,
 +	"tooltip-format": "{title}",
 +	"on-click": "activate",
 +	"on-click-middle": "close",
@@ -378,6 +449,8 @@ index 0000000..510616f
 +- *#taskbar button.minimized*
 +- *#taskbar button.maximized*
 +- *#taskbar button.fullscreen*
++- *#taskbar label.title*
++- *#taskbar label.app-label*
 diff --git a/meson.build b/meson.build
 index e3839cf..1062b12 100644
 --- a/meson.build
@@ -984,10 +1057,10 @@ index 63aecb7..bd0196c 100644
 +}  // namespace waybar::modules::mango
 diff --git a/src/modules/mango/taskbar.cpp b/src/modules/mango/taskbar.cpp
 new file mode 100644
-index 0000000..269baba
+index 0000000..0cb0bc0
 --- /dev/null
 +++ b/src/modules/mango/taskbar.cpp
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,289 @@
 +#include "modules/mango/taskbar.hpp"
 +
 +#include <fmt/format.h>
@@ -1001,13 +1074,26 @@ index 0000000..269baba
 +namespace waybar::modules::mango {
 +
 +Taskbar::Taskbar(const std::string& id, const Bar& bar, const Json::Value& config)
-+    : AModule(config, "taskbar", id, false, false), bar_(bar), box_(bar.orientation, 0) {
++    : AModule(config, "taskbar", id, false, false),
++      bar_(bar),
++      box_(bar.orientation, 0),
++      options_(parseTaskbarOptions(config)) {
 +  box_.set_name("taskbar");
 +  if (!id.empty()) box_.get_style_context()->add_class(id);
 +  box_.get_style_context()->add_class(MODULE_CLASS);
 +  box_.get_style_context()->add_class("empty");
 +  box_.get_style_context()->add_class("disconnected");
 +  event_box_.add(box_);
++
++  if (options_.app_labels_type_invalid) {
++    spdlog::warn("Invalid mango/taskbar app-labels: expected an object");
++  }
++  for (const auto& app_id : options_.invalid_app_label_entries) {
++    spdlog::warn("Invalid mango/taskbar app-labels entry '{}': expected a string label", app_id);
++  }
++  if (options_.app_label_width_invalid) {
++    spdlog::warn("Invalid mango/taskbar app-label-width: expected a non-negative integer");
++  }
 +
 +  if (config_["all-outputs"].isBool()) all_outputs_ = config_["all-outputs"].asBool();
 +  if (config_["format"].isString()) format_ = config_["format"].asString();
@@ -1111,9 +1197,11 @@ index 0000000..269baba
 +
 +  result.button.set_relief(Gtk::RELIEF_NONE);
 +  result.button.set_hexpand(true);
-+  result.label.set_halign(Gtk::ALIGN_FILL);
-+  result.label.set_hexpand(true);
-+  result.label.set_single_line_mode(true);
++  result.content.set_hexpand(true);
++  result.title_label.get_style_context()->add_class("title");
++  result.title_label.set_halign(Gtk::ALIGN_FILL);
++  result.title_label.set_hexpand(true);
++  result.title_label.set_single_line_mode(true);
 +
 +  float alignment = 0.5F;
 +  if (config_["justify"].isString()) {
@@ -1125,14 +1213,28 @@ index 0000000..269baba
 +    else if (justify != "center")
 +      spdlog::warn("Invalid mango/taskbar justify: expected left, center, or right");
 +  }
-+  result.label.set_xalign(alignment);
++  result.title_label.set_xalign(alignment);
 +
 +  if (config_["truncate"].isBool() && config_["truncate"].asBool()) {
-+    result.label.set_line_wrap(false);
-+    result.label.set_ellipsize(Pango::ELLIPSIZE_END);
++    result.title_label.set_line_wrap(false);
++    result.title_label.set_ellipsize(Pango::ELLIPSIZE_END);
++    result.title_label.set_width_chars(1);
 +  }
 +
-+  result.button.add(result.label);
++  result.content.pack_start(result.title_label, true, true, 0);
++  if (options_.app_label_width > 0) {
++    result.app_label_sizer.set_size_request(options_.app_label_width, -1);
++    result.app_label_slot.add(result.app_label_sizer);
++    result.app_label.get_style_context()->add_class("app-label");
++    result.app_label.set_halign(Gtk::ALIGN_FILL);
++    result.app_label.set_valign(Gtk::ALIGN_FILL);
++    result.app_label.set_single_line_mode(true);
++    result.app_label.set_ellipsize(Pango::ELLIPSIZE_END);
++    result.app_label_slot.add_overlay(result.app_label);
++    result.content.pack_end(result.app_label_slot, false, false, 0);
++  }
++
++  result.button.add(result.content);
 +  result.button.add_events(Gdk::BUTTON_RELEASE_MASK);
 +  result.button.signal_button_release_event().connect(
 +      [this, id](GdkEventButton* event) { return handleButtonClick(event, id); }, false);
@@ -1151,9 +1253,10 @@ index 0000000..269baba
 +  auto text = formatText(format_, client);
 +  text = waybar::util::rewriteString(text, config_["rewrite"]);
 +  if (config_["markup"].isBool() && config_["markup"].asBool())
-+    task.label.set_markup(text);
++    task.title_label.set_markup(text);
 +  else
-+    task.label.set_text(text);
++    task.title_label.set_text(text);
++  task.app_label.set_text(appLabelFor(options_, client.app_id));
 +
 +  if (tooltipEnabled()) {
 +    auto tooltip = formatText(tooltip_format_, client);

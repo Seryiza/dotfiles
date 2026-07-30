@@ -63,6 +63,15 @@ in
           format = "{title}";
           justify = "left";
           truncate = true;
+          # Mango app IDs are exact; inspect them with `mmsg get all-clients`.
+          app-labels = {
+            Alacritty = "A";
+            Emacs = "E";
+            emacs = "E";
+            firefox = "F";
+            "org.telegram.desktop" = "T";
+          };
+          app-label-width = 16;
           tooltip = true;
           tooltip-format = "{title}";
           on-click = "activate";
@@ -81,7 +90,7 @@ in
           overview-label = "OVERVIEW";
         };
 
-      "custom/wireguard" = {
+        "custom/wireguard" = {
           format = "{text}";
           exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard.sh short";
           interval = 15;
@@ -164,7 +173,7 @@ in
           ];
           format-ethernet = "";
           format-linked = "{ifname} (No IP)";
-         format-disconnected = "Disconnected";
+          format-disconnected = "Disconnected";
           format-disabled = "Wi-Fi disabled";
           tooltip-format-wifi = ''
             {essid} ({signalStrength}%)

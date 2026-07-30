@@ -1,9 +1,9 @@
 diff --git a/test/mango.cpp b/test/mango.cpp
 new file mode 100644
-index 0000000..16b6dfc
+index 0000000..242ef0e
 --- /dev/null
 +++ b/test/mango.cpp
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,325 @@
 +#if __has_include(<catch2/catch_test_macros.hpp>)
 +#include <catch2/catch_test_macros.hpp>
 +#else
@@ -195,6 +195,103 @@ index 0000000..16b6dfc
 +    cache.snapshot = parsedSnapshot(makeSnapshot({makeClient(42, "new client")}), 8);
 +    REQUIRE(cache.actionable(42, 8));
 +    REQUIRE_FALSE(cache.actionable(42, 7));
++  }
++}
++
++TEST_CASE("Mango taskbar app label options default safely", "[mango][taskbar]") {
++  const auto options = mango::parseTaskbarOptions(Json::Value(Json::objectValue));
++
++  REQUIRE(options.app_labels.empty());
++  REQUIRE_FALSE(options.app_labels_invalid);
++  REQUIRE_FALSE(options.app_labels_type_invalid);
++  REQUIRE(options.invalid_app_label_entries.empty());
++  REQUIRE(options.app_label_width == 0);
++  REQUIRE_FALSE(options.app_label_width_invalid);
++  REQUIRE(mango::appLabelFor(options, "Alacritty").empty());
++}
++
++TEST_CASE("Mango taskbar app label lookup is exact and case-sensitive", "[mango][taskbar]") {
++  Json::Value config(Json::objectValue);
++  config["app-labels"]["Alacritty"] = "TERM";
++  config["app-labels"]["org.telegram.desktop"] = "TG";
++
++  const auto options = mango::parseTaskbarOptions(config);
++  REQUIRE(mango::appLabelFor(options, "Alacritty") == "TERM");
++  REQUIRE(mango::appLabelFor(options, "org.telegram.desktop") == "TG");
++  REQUIRE(mango::appLabelFor(options, "alacritty").empty());
++  REQUIRE(mango::appLabelFor(options, "Alacritty ").empty());
++  REQUIRE(mango::appLabelFor(options, "firefox").empty());
++}
++
++TEST_CASE("Mango taskbar unmatched app label lookup is empty", "[mango][taskbar]") {
++  Json::Value config(Json::objectValue);
++  config["app-labels"]["Alacritty"] = "TERM";
++
++  const auto options = mango::parseTaskbarOptions(config);
++  REQUIRE(mango::appLabelFor(options, "firefox").empty());
++}
++
++TEST_CASE("Mango taskbar app label width validates type and range", "[mango][taskbar]") {
++  Json::Value config(Json::objectValue);
++  config["app-label-width"] = Json::UInt{28};
++  const auto valid = mango::parseTaskbarOptions(config);
++  REQUIRE(valid.app_label_width == 28);
++  REQUIRE_FALSE(valid.app_label_width_invalid);
++
++  config["app-label-width"] = 12;
++  const auto valid_signed = mango::parseTaskbarOptions(config);
++  REQUIRE(valid_signed.app_label_width == 12);
++  REQUIRE_FALSE(valid_signed.app_label_width_invalid);
++
++  SECTION("negative widths fall back to zero") {
++    config["app-label-width"] = -1;
++    const auto options = mango::parseTaskbarOptions(config);
++    REQUIRE(options.app_label_width == 0);
++    REQUIRE(options.app_label_width_invalid);
++  }
++
++  SECTION("widths above the GTK integer range fall back to zero") {
++    config["app-label-width"] =
++        static_cast<Json::Int64>(std::numeric_limits<int>::max()) + 1;
++    const auto options = mango::parseTaskbarOptions(config);
++    REQUIRE(options.app_label_width == 0);
++    REQUIRE(options.app_label_width_invalid);
++  }
++
++  SECTION("non-integer widths fall back to zero") {
++    for (const auto& invalid : {Json::Value("28"), Json::Value(28.5), Json::Value(true)}) {
++      config["app-label-width"] = invalid;
++      const auto options = mango::parseTaskbarOptions(config);
++      REQUIRE(options.app_label_width == 0);
++      REQUIRE(options.app_label_width_invalid);
++    }
++  }
++}
++
++TEST_CASE("Mango taskbar app label maps validate entries independently", "[mango][taskbar]") {
++  SECTION("a non-object map falls back to empty") {
++    Json::Value config(Json::objectValue);
++    config["app-labels"] = "Alacritty=TERM";
++    const auto options = mango::parseTaskbarOptions(config);
++    REQUIRE(options.app_labels.empty());
++    REQUIRE(options.app_labels_invalid);
++    REQUIRE(options.app_labels_type_invalid);
++  }
++
++  SECTION("valid strings survive mixed invalid entries") {
++    Json::Value config(Json::objectValue);
++    config["app-labels"]["Alacritty"] = "TERM";
++    config["app-labels"]["firefox"] = 42;
++    config["app-labels"]["org.telegram.desktop"] = false;
++
++    const auto options = mango::parseTaskbarOptions(config);
++    REQUIRE(options.app_labels.size() == 1);
++    REQUIRE(mango::appLabelFor(options, "Alacritty") == "TERM");
++    REQUIRE(mango::appLabelFor(options, "firefox").empty());
++    REQUIRE(mango::appLabelFor(options, "org.telegram.desktop").empty());
++    REQUIRE(options.app_labels_invalid);
++    REQUIRE_FALSE(options.app_labels_type_invalid);
++    REQUIRE(options.invalid_app_label_entries.size() == 2);
 +  }
 +}
 +
