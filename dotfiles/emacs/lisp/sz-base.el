@@ -653,3 +653,13 @@ instead.  Return non-nil when Emacs handled the close request."
 (use-package all-the-icons
   :ensure t
   :if (display-graphic-p))
+
+(use-package treesit-auto
+  :ensure t
+
+  :custom
+  (treesit-auto-install 'prompt)
+
+  :config
+  (treesit-auto-add-to-auto-mode-alist 'all)
+  (global-treesit-auto-mode))

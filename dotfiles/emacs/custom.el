@@ -13,8 +13,8 @@
                            json-mode kind-icon magit markdown-mode
                            meow modus-themes mu4e nix-mode orderless
                            org-download org-repeat-by-cron projectile
-                           rg super-save telega tempel verb vertico
-                           vterm yaml-mode))
+                           rg super-save telega tempel treesit-auto
+                           verb vertico vterm yaml-mode))
  '(package-vc-selected-packages
    '((claude-code :url "https://github.com/stevemolitor/claude-code.el"))))
 
