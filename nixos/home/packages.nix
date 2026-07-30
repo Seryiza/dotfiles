@@ -67,6 +67,7 @@ in
     llm-agents-pkgs.codex-acp
     llm-agents-pkgs.pi
     llm-agents-pkgs.opencode
+    llm-agents-pkgs.qmd
     llm-agents-pkgs.spec-kit
 
     (pkgs.google-cloud-sdk.withExtraComponents [
@@ -182,6 +183,8 @@ in
     pkgs.nautilus
     pkgs.exercism
     unstable-pkgs.brotab
+    unstable-pkgs.ollama
+    unstable-pkgs.llama-cpp
     pkgs.gnome-font-viewer
     pkgs.ghostty
     pkgs.pnpm
