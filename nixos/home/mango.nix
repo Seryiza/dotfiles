@@ -66,9 +66,9 @@ in
 
           gappih = 6;
           gappiv = 6;
-          gappoh = 6;
-          gappov = 6;
-          borderpx = 3;
+          gappoh = 0;
+          gappov = 0;
+          borderpx = 0;
           rootcolor = "0xffffffff";
           bordercolor = "0xd3d3d3ff";
           focuscolor = "0x000000ff";

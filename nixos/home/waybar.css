@@ -11,8 +11,18 @@ window#waybar {
     min-height: 20px;
 }
 
+window#waybar.right {
+    border-left: 3px solid #000000;
+}
+
 window#waybar.hidden {
     opacity: 0.2;
+}
+
+.modules-left,
+.modules-center,
+.modules-right {
+    padding-left: 3px;
 }
 
 .modules-left > *,
