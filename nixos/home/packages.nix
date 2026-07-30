@@ -194,5 +194,6 @@ in
     pkgs.postman
     pkgs.insomnia
     pkgs.baobab
+    pkgs.uv
   ];
 }
