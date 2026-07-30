@@ -16,10 +16,12 @@ in
       }).overrideAttrs
         (old: {
           src = waybar-src;
+          nativeCheckInputs = (old.nativeCheckInputs or [ ]) ++ [ pkgs.xvfb-run ];
           patches = (old.patches or [ ]) ++ [
             ./waybar-mango-taskbar.patch
             ./waybar-mango-workspaces.patch
             ./waybar-mango-tests.patch
+            ./waybar-mango-taskbar-widget-tests.patch
             ./waybar-module-halign.patch
             ./waybar-tray-orientation.patch
           ];

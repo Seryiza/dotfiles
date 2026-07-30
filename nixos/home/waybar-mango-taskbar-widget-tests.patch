@@ -1,0 +1,263 @@
+diff --git a/include/modules/mango/taskbar_widget.hpp b/include/modules/mango/taskbar_widget.hpp
+new file mode 100644
+index 0000000..274eece
+--- /dev/null
++++ b/include/modules/mango/taskbar_widget.hpp
+@@ -0,0 +1,45 @@
++#pragma once
++
++#include <gtkmm/box.h>
++#include <gtkmm/label.h>
++#include <gtkmm/overlay.h>
++#include <json/value.h>
++
++#include <string>
++
++#include "modules/mango/taskbar_model.hpp"
++#include "util/rewrite_string.hpp"
++
++namespace waybar::modules::mango {
++
++inline bool setupTaskbarAppLabelSlot(Gtk::Box& content, Gtk::Box& sizer, Gtk::Label& label,
++                                     Gtk::Overlay& slot, int width) {
++  if (width <= 0) return false;
++
++  sizer.set_size_request(width, -1);
++  slot.add(sizer);
++  label.get_style_context()->add_class("app-label");
++  label.set_halign(Gtk::ALIGN_FILL);
++  label.set_valign(Gtk::ALIGN_FILL);
++  label.set_single_line_mode(true);
++  label.set_ellipsize(Pango::ELLIPSIZE_END);
++  slot.add_overlay(label);
++  content.pack_end(slot, false, false, 0);
++  return true;
++}
++
++inline void updateTaskbarLabels(Gtk::Label& title_label, Gtk::Label& app_label,
++                                const Json::Value& config, const TaskbarOptions& options,
++                                const ClientInfo& client, std::string title) {
++  title = waybar::util::rewriteString(title, config["rewrite"]);
++  if (config["markup"].isBool() && config["markup"].asBool())
++    title_label.set_markup(title);
++  else
++    title_label.set_text(title);
++
++  // App labels are presentation metadata, not title markup. Keep the exact
++  // configured value literal and isolate it from title rewrite rules.
++  app_label.set_text(appLabelFor(options, client.app_id));
++}
++
++}  // namespace waybar::modules::mango
+diff --git a/src/modules/mango/taskbar.cpp b/src/modules/mango/taskbar.cpp
+index 0cb0bc0..34a6ff7 100644
+--- a/src/modules/mango/taskbar.cpp
++++ b/src/modules/mango/taskbar.cpp
+@@ -6,6 +6,7 @@
+ #include <algorithm>
+ #include <unordered_set>
+ 
++#include "modules/mango/taskbar_widget.hpp"
+ #include "util/rewrite_string.hpp"
+ 
+ namespace waybar::modules::mango {
+@@ -159,17 +160,8 @@ Taskbar::Task& Taskbar::addTask(ClientId id, std::uint64_t generation) {
+   }
+ 
+   result.content.pack_start(result.title_label, true, true, 0);
+-  if (options_.app_label_width > 0) {
+-    result.app_label_sizer.set_size_request(options_.app_label_width, -1);
+-    result.app_label_slot.add(result.app_label_sizer);
+-    result.app_label.get_style_context()->add_class("app-label");
+-    result.app_label.set_halign(Gtk::ALIGN_FILL);
+-    result.app_label.set_valign(Gtk::ALIGN_FILL);
+-    result.app_label.set_single_line_mode(true);
+-    result.app_label.set_ellipsize(Pango::ELLIPSIZE_END);
+-    result.app_label_slot.add_overlay(result.app_label);
+-    result.content.pack_end(result.app_label_slot, false, false, 0);
+-  }
++  setupTaskbarAppLabelSlot(result.content, result.app_label_sizer, result.app_label,
++                           result.app_label_slot, options_.app_label_width);
+ 
+   result.button.add(result.content);
+   result.button.add_events(Gdk::BUTTON_RELEASE_MASK);
+@@ -187,13 +179,8 @@ void Taskbar::clearTasks() {
+ }
+ 
+ void Taskbar::updateTask(Task& task, const ClientInfo& client, bool actionable) {
+-  auto text = formatText(format_, client);
+-  text = waybar::util::rewriteString(text, config_["rewrite"]);
+-  if (config_["markup"].isBool() && config_["markup"].asBool())
+-    task.title_label.set_markup(text);
+-  else
+-    task.title_label.set_text(text);
+-  task.app_label.set_text(appLabelFor(options_, client.app_id));
++  updateTaskbarLabels(task.title_label, task.app_label, config_, options_, client,
++                      formatText(format_, client));
+ 
+   if (tooltipEnabled()) {
+     auto tooltip = formatText(tooltip_format_, client);
+diff --git a/test/mango-taskbar-widget.cpp b/test/mango-taskbar-widget.cpp
+new file mode 100644
+index 0000000..b3673e2
+--- /dev/null
++++ b/test/mango-taskbar-widget.cpp
+@@ -0,0 +1,129 @@
++#if __has_include(<catch2/catch_test_macros.hpp>)
++#include <catch2/catch_test_macros.hpp>
++#else
++#include <catch2/catch.hpp>
++#endif
++
++#include <gtkmm/main.h>
++#include <gtkmm/window.h>
++
++#include <string>
++
++#include "modules/mango/taskbar_widget.hpp"
++
++namespace mango = waybar::modules::mango;
++
++namespace {
++
++void initializeGtk() {
++  static Gtk::Main gtk;
++}
++
++void flushGtkEvents() {
++  while (Gtk::Main::events_pending()) Gtk::Main::iteration();
++}
++
++int requestedWidth(Gtk::Widget& widget) {
++  int width = 0;
++  int height = 0;
++  widget.get_size_request(width, height);
++  return width;
++}
++
++struct LabelFixture {
++  explicit LabelFixture(int width)
++      : sizer(Gtk::ORIENTATION_HORIZONTAL, 0), content(Gtk::ORIENTATION_HORIZONTAL, 0) {
++    title.set_hexpand(true);
++    content.pack_start(title, true, true, 0);
++    has_slot = mango::setupTaskbarAppLabelSlot(content, sizer, app_label, slot, width);
++  }
++
++  Gtk::Label title;
++  Gtk::Box sizer;
++  Gtk::Label app_label;
++  Gtk::Overlay slot;
++  Gtk::Box content;
++  bool has_slot = false;
++};
++
++void realizeInWindow(LabelFixture& fixture, int width = 160) {
++  Gtk::Window window;
++  window.set_default_size(width, 30);
++  window.add(fixture.content);
++  window.show_all();
++  flushGtkEvents();
++
++  REQUIRE(fixture.slot.get_allocated_width() == requestedWidth(fixture.sizer));
++  REQUIRE(fixture.app_label.get_allocated_width() == fixture.slot.get_allocated_width());
++
++  window.remove();
++  flushGtkEvents();
++}
++
++}  // namespace
++
++TEST_CASE("Mango taskbar app label slot keeps fixed GTK geometry", "[mango][taskbar][gtk]") {
++  initializeGtk();
++
++  SECTION("positive width reserves an empty unmatched suffix") {
++    LabelFixture fixture(28);
++    const mango::TaskbarOptions options;
++    mango::ClientInfo client;
++    client.app_id = "unmatched.app";
++
++    mango::updateTaskbarLabels(fixture.title, fixture.app_label, Json::Value(Json::objectValue),
++                               options, client, "Window title");
++
++    REQUIRE(fixture.has_slot);
++    REQUIRE(requestedWidth(fixture.sizer) == 28);
++    REQUIRE(fixture.app_label.get_text().empty());
++    realizeInWindow(fixture);
++  }
++
++  SECTION("zero width suppresses the suffix widget") {
++    LabelFixture fixture(0);
++
++    REQUIRE_FALSE(fixture.has_slot);
++    REQUIRE(fixture.slot.get_parent() == nullptr);
++    REQUIRE(fixture.content.get_children().size() == 1);
++  }
++
++  SECTION("long labels stay inside the fixed slot and ellipsize") {
++    LabelFixture fixture(28);
++    Json::Value config(Json::objectValue);
++    const std::string long_label = "A very long application label";
++    config["app-labels"]["org.example.LongApp"] = long_label;
++    const auto options = mango::parseTaskbarOptions(config);
++    mango::ClientInfo client;
++    client.app_id = "org.example.LongApp";
++
++    mango::updateTaskbarLabels(fixture.title, fixture.app_label, config, options, client,
++                               "Window title");
++
++    REQUIRE(fixture.app_label.get_text() == long_label);
++    REQUIRE(fixture.app_label.get_ellipsize() == Pango::ELLIPSIZE_END);
++    realizeInWindow(fixture);
++  }
++}
++
++TEST_CASE("Mango taskbar app ID mapping stays literal and title-only rules stay isolated",
++          "[mango][taskbar][gtk]") {
++  initializeGtk();
++
++  Json::Value config(Json::objectValue);
++  config["markup"] = true;
++  config["rewrite"]["^Original title$"] = "<i>Rewritten title</i>";
++  config["app-labels"]["org.example.App"] = "<b>APP & literal</b>";
++  const auto options = mango::parseTaskbarOptions(config);
++  mango::ClientInfo client;
++  client.app_id = "org.example.App";
++
++  LabelFixture fixture(28);
++  mango::updateTaskbarLabels(fixture.title, fixture.app_label, config, options, client,
++                             "Original title");
++
++  REQUIRE(fixture.title.get_use_markup());
++  REQUIRE(fixture.title.get_text() == "Rewritten title");
++  REQUIRE_FALSE(fixture.app_label.get_use_markup());
++  REQUIRE(fixture.app_label.get_text() == "<b>APP & literal</b>");
++}
+diff --git a/test/meson.build b/test/meson.build
+index 3f35487..bbd9b43 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -12,7 +12,9 @@ test_src = files(
+     'main.cpp',
+     'config.cpp',
+     'mango.cpp',
++    'mango-taskbar-widget.cpp',
+     '../src/config.cpp',
++    '../src/util/rewrite_string.cpp',
+ )
+ 
+ waybar_test = executable(
+@@ -22,9 +24,13 @@ waybar_test = executable(
+     include_directories: test_inc,
+ )
+ 
++xvfb_run = find_program('xvfb-run')
++
+ test(
+     'waybar',
+-    waybar_test,
++    xvfb_run,
++    args: ['-a', waybar_test],
++    env: ['GDK_BACKEND=x11'],
+     workdir: meson.project_source_root(),
+ )
+ 
