@@ -115,7 +115,7 @@ in
             "SUPER,e,spawn,env QT_QPA_PLATFORM=xcb Enpass"
           ]
           ++ builtins.concatMap (tag: [
-            "CTRL,${toString tag},view,${toString tag},0"
+            "SUPER,${toString tag},view,${toString tag},0"
             "ALT,${toString tag},tag,${toString tag},0"
             "ALT+SHIFT,${toString tag},toggletag,${toString tag}"
           ]) (builtins.genList (index: index + 1) 9)
