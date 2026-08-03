@@ -2,7 +2,10 @@ diff --git a/man/waybar.5.scd.in b/man/waybar.5.scd.in
 index ff2af1b..a495592 100644
 --- a/man/waybar.5.scd.in
 +++ b/man/waybar.5.scd.in
-@@ -81,0 +82,7 @@ The visual display elements for waybar use a CSS stylesheet. Waybar supports *st
+@@ -79,6 +79,13 @@ The visual display elements for waybar use a CSS stylesheet. Waybar supports *st
+ 	typeof: array
+ 	Modules that will be displayed on the right.
+ 
 +*modules-right-halign* ++
 +	typeof: string|object ++
 +	default: fill ++
@@ -10,11 +13,17 @@ index ff2af1b..a495592 100644
 +	Possible values are *start*, *center*, *end*, and *fill*. An object can set a ++
 +	*default* alignment and override it by exact module name.
 +
+ *margin* ++
+ 	typeof: string ++
+ 	Margins value using the CSS format without units.
 diff --git a/src/bar.cpp b/src/bar.cpp
-index ec3189c..4ccdd97 100644
+index d84aafe..3ef441a 100644
 --- a/src/bar.cpp
 +++ b/src/bar.cpp
-@@ -569,0 +570,24 @@ waybar::util::KillSignalAction waybar::Bar::getOnSigusr2Action() { return this->
+@@ -566,6 +566,30 @@ void waybar::Bar::handleSignal(int signal) {
+ waybar::util::KillSignalAction waybar::Bar::getOnSigusr1Action() { return this->onSigusr1; }
+ waybar::util::KillSignalAction waybar::Bar::getOnSigusr2Action() { return this->onSigusr2; }
+ 
 +static void applyModuleHalign(Gtk::Widget& widget, const Json::Value& config,
 +                              const std::string& option) {
 +  if (config.isNull()) {
@@ -39,7 +48,13 @@ index ec3189c..4ccdd97 100644
 +  }
 +}
 +
-@@ -604,0 +629,16 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
+ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
+                              waybar::Group* group = nullptr) {
+   auto module_list = group != nullptr ? config[pos]["modules"] : config[pos];
+@@ -601,6 +625,22 @@ void waybar::Bar::getModules(const Factory& factory, const std::string& pos,
+           module = factory.makeModule(ref, pos);
+         }
+ 
 +        if (group == nullptr && pos == "modules-right") {
 +          const auto& right_halign = config["modules-right-halign"];
 +          Gtk::Widget& widget = *module;
@@ -56,3 +71,6 @@ index ec3189c..4ccdd97 100644
 +          }
 +        }
 +
+         std::shared_ptr<AModule> module_sp(module);
+         modules_all_.emplace_back(module_sp);
+         if (group != nullptr) {

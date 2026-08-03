@@ -33,7 +33,7 @@
     };
     mango.url = "github:mangowm/mango";
     waybar-src = {
-      url = "github:Alexays/Waybar/7f732f055316d3b0ab89f57e4347d24c1cc96167";
+      url = "github:Alexays/Waybar/d44a27af1023b5c68f6f61435ba550bf03f69938";
       flake = false;
     };
     zed.url = "github:zed-industries/zed/v1.10.1";
