@@ -185,6 +185,7 @@ in
     unstable-pkgs.brotab
     unstable-pkgs.ollama
     unstable-pkgs.llama-cpp
+    unstable-pkgs.heynote
     pkgs.gnome-font-viewer
     pkgs.ghostty
     pkgs.pnpm
