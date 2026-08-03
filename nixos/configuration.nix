@@ -347,6 +347,23 @@ in {
     waylandCompositors = {};
   };
 
+  # Keep the active UWSM session alive when package upgrades change its
+  # template units. The updated units take effect after logout or reboot.
+  systemd.user.services = {
+    "wayland-session-bindpid@" = {
+      overrideStrategy = "asDropin";
+      restartIfChanged = false;
+    };
+    "wayland-wm@" = {
+      overrideStrategy = "asDropin";
+      restartIfChanged = false;
+    };
+    "wayland-wm-env@" = {
+      overrideStrategy = "asDropin";
+      restartIfChanged = false;
+    };
+  };
+
   services.dbus.enable = true;
 
   qt = {
