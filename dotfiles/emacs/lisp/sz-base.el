@@ -645,7 +645,7 @@ instead.  Return non-nil when Emacs handled the close request."
    ("M-u" . tab-close))
 
   :config
-  (tab-bar-mode 1)
+  (tab-bar-mode nil)
   (setq tab-bar-close-button-show nil)
   (setq tab-bar-new-tab-choice "*scratch*")
   (setq tab-bar-format '(tab-bar-format-tabs tab-bar-separator)))
