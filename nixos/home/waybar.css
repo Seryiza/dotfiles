@@ -143,6 +143,12 @@ button.active:hover,
     color: #000000;
 }
 
+#custom-org_timeblock,
+#custom-org_clock {
+    color: #FFFFFF;
+    background-color: #000000;
+}
+
 #tray {
     background-color: #000000;
     color: #FFFFFF;

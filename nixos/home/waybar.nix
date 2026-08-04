@@ -40,10 +40,7 @@ in
         position = "right";
         width = 250;
         spacing = 0;
-        modules-right-halign = {
-          default = "start";
-          tray = "fill";
-        };
+        modules-right-halign = "fill";
         modules-left = [
           "mango/workspaces"
           "mango/taskbar"
@@ -95,6 +92,7 @@ in
         };
 
         "custom/org_timeblock" = {
+          align = 0.0;
           exec = "${config.home.homeDirectory}/.local/bin/waybar-org-timeblock";
           interval = 15;
           format = "{text}";
@@ -104,6 +102,7 @@ in
         };
 
         "custom/org_clock" = {
+          align = 0.0;
           exec = "${config.home.homeDirectory}/.local/bin/waybar-org-current-clock";
           interval = 15;
           format = "{text}";
@@ -113,13 +112,19 @@ in
         };
 
         "custom/wireguard" = {
+          align = 0.0;
           format = "{text}";
           exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard.sh short";
           interval = 15;
           return-type = "json";
         };
 
+        "sway/language" = {
+          align = 0.0;
+        };
+
         "mango/language" = {
+          align = 0.0;
           format = "{short}";
         };
 
@@ -140,10 +145,12 @@ in
           expand = false;
         };
         "battery" = {
+          align = 0.0;
           format = "{capacity}% battery";
           format-full = "";
         };
         "clock" = {
+          align = 0.0;
           interval = 60;
           format = "{:%d %b %H:%M}";
           tooltip = true;
@@ -180,6 +187,7 @@ in
           };
         };
         "network" = {
+          align = 0.0;
           # Waybar does not expose arbitrary numeric format conditions for
           # signalStrength. A five-entry format-icons table maps to 20-point
           # buckets, so only the 0..19% bucket renders text; empty buckets hide
@@ -202,6 +210,7 @@ in
             {ifname}: {ipaddr}/{cidr}'';
         };
         "wireplumber" = {
+          align = 0.0;
           format = "{volume}% {node_name}{format_source}";
           format-muted = "MUTED {node_name}{format_source}";
           format-source = " +MIC";
