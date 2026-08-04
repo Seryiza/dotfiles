@@ -40,7 +40,10 @@ in
         position = "right";
         width = 250;
         spacing = 0;
-        modules-right-halign = "fill";
+        modules-right-halign = {
+          default = "fill";
+          privacy = "start";
+        };
         modules-left = [
           "mango/workspaces"
           "mango/taskbar"
@@ -136,7 +139,7 @@ in
         };
 
         "privacy" = {
-          icon-size = 12;
+          icon-size = 10;
           icon-spacing = 0;
         };
         "tray" = {
