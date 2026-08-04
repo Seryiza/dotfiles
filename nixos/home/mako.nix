@@ -1,12 +1,15 @@
 { pkgs, ... }:
 let
-  volumeSound =
-    "${pkgs.yaru-theme}/share/sounds/Yaru/stereo/audio-volume-change.oga";
-in {
+  volumeSound = "${pkgs.yaru-theme}/share/sounds/Yaru/stereo/audio-volume-change.oga";
+in
+{
   services.mako = {
     enable = true;
     settings = {
       icons = false;
+      "background-color" = "#000000";
+      "text-color" = "#ffffff";
+      "border-size" = 0;
 
       "app-name=ya-vol" = {
         layer = "overlay";
@@ -26,7 +29,9 @@ in {
         format = "<b>%s</b>%b";
       };
 
-      "app-name=volume group-index=0" = { invisible = 0; };
+      "app-name=volume group-index=0" = {
+        invisible = 0;
+      };
     };
   };
 }
