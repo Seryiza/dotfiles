@@ -50,6 +50,8 @@ in
         ];
         modules-center = [ ];
         modules-right = [
+          "custom/org_timeblock"
+          "custom/org_clock"
           "privacy"
           "wireplumber"
           "network"
@@ -90,6 +92,24 @@ in
           on-click = "activate";
           on-click-right = "toggle";
           overview-label = "OVERVIEW";
+        };
+
+        "custom/org_timeblock" = {
+          exec = "${config.home.homeDirectory}/.local/bin/waybar-org-timeblock";
+          interval = 15;
+          format = "{text}";
+          max-length = 60;
+          escape = true;
+          hide-empty-text = true;
+        };
+
+        "custom/org_clock" = {
+          exec = "${config.home.homeDirectory}/.local/bin/waybar-org-current-clock";
+          interval = 15;
+          format = "{text}";
+          max-length = 60;
+          escape = true;
+          hide-empty-text = true;
         };
 
         "custom/wireguard" = {
