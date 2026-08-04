@@ -352,14 +352,17 @@ in {
   systemd.user.services = {
     "wayland-session-bindpid@" = {
       overrideStrategy = "asDropin";
+      enableDefaultPath = false;
       restartIfChanged = false;
     };
     "wayland-wm@" = {
       overrideStrategy = "asDropin";
+      enableDefaultPath = false;
       restartIfChanged = false;
     };
     "wayland-wm-env@" = {
       overrideStrategy = "asDropin";
+      enableDefaultPath = false;
       restartIfChanged = false;
     };
   };
