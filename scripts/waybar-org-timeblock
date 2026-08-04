@@ -2,7 +2,7 @@
 set -eu
 
 SYSTEMCTL="${SYSTEMCTL:-/run/current-system/sw/bin/systemctl}"
-EMACSCLIENT="${EMACSCLIENT:-/run/current-system/sw/bin/emacsclient}"
+EMACSCLIENT="${EMACSCLIENT:-emacsclient}"
 EMACS_SERVICE="${EMACS_SERVICE:-emacs.service}"
 # Only query the Emacs daemon managed by the systemd user service.
 # Do not pass emacsclient -a/--alternate-editor: that would spawn a new Emacs
