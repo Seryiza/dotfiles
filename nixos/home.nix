@@ -129,6 +129,66 @@ in {
       force = true;
     };
 
+    ".local/bin/increase-current-volume" = {
+      source = ../scripts/increase-current-volume;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/decrease-current-volume" = {
+      source = ../scripts/decrease-current-volume;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/toggle-audio-mute" = {
+      source = ../scripts/toggle-audio-mute;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/toggle-microphone-mute" = {
+      source = ../scripts/toggle-microphone-mute;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/display-current-volume" = {
+      source = ../scripts/display-current-volume;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/display-current-microphone" = {
+      source = ../scripts/display-current-microphone;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/increase-backlight" = {
+      source = ../scripts/increase-backlight;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/decrease-backlight" = {
+      source = ../scripts/decrease-backlight;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/display-backlight" = {
+      source = ../scripts/display-backlight;
+      executable = true;
+      force = true;
+    };
+
+    ".local/bin/waybar-wireguard" = {
+      source = ../scripts/waybar-wireguard;
+      executable = true;
+      force = true;
+    };
+
     # ".npmrc".text = ''
     #   registry=https://registry.npmjs.org/
     #   prefix=${config.home.homeDirectory}/.cache/npm/global

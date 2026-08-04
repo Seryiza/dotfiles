@@ -125,7 +125,7 @@ in
             "SHIFT,Print,spawn_shell,grim - | wl-copy | drawing -c"
 
             "NONE,XF86MonBrightnessUp,spawn_shell,increase-backlight && display-backlight"
-            "NONE,XF86MonBrightnessDown,spawn_shell,descrease-backlight && display-backlight"
+            "NONE,XF86MonBrightnessDown,spawn_shell,decrease-backlight && display-backlight"
             "NONE,XF86AudioPlay,spawn,playerctl play-pause"
             "NONE,XF86AudioRaiseVolume,spawn_shell,increase-current-volume && display-current-volume"
             "NONE,XF86AudioLowerVolume,spawn_shell,decrease-current-volume && display-current-volume"

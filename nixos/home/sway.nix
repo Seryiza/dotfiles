@@ -91,7 +91,7 @@
           "XF86MonBrightnessUp" =
             "exec increase-backlight && display-backlight";
           "XF86MonBrightnessDown" =
-            "exec descrease-backlight && display-backlight";
+            "exec decrease-backlight && display-backlight";
           "XF86AudioPlay" = "exec playerctl play-pause";
           "XF86AudioRaiseVolume" =
             "exec increase-current-volume && display-current-volume";

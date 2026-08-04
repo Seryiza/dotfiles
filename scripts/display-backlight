@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+backlight=$(brightnessctl -m | awk -F, 'NR == 1 { gsub(/%/, "", $4); print $4 }')
+
+notify-send -t 1500 -a 'ya-backlight' -h "int:value:$backlight" \
+  "Backlight: ${backlight}%"

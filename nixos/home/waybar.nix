@@ -114,7 +114,7 @@ in
         "custom/wireguard" = {
           align = 0.0;
           format = "{text}";
-          exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard.sh short";
+          exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard short";
           interval = 15;
           return-type = "json";
         };
@@ -242,7 +242,7 @@ in
 
       #   "custom/wireguard" = {
       #     format = "{text}";
-      #     exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard.sh short";
+      #     exec = "${config.home.homeDirectory}/.local/bin/waybar-wireguard short";
       #     interval = 15;
       #     return-type = "json";
       #   };

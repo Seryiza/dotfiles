@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+for dependency in nmcli jq; do
+  if ! command -v "$dependency" >/dev/null 2>&1; then
+    printf 'ERROR: %s is required\n' "$dependency" >&2
+    exit 1
+  fi
+done
+
+declare -A active_uuids=()
+declare -a connected_names=()
+declare -a connected_details=()
+declare -a available_names=()
+
+load_connections() {
+  local uuid type name addresses detail
+
+  while IFS=: read -r uuid type; do
+    [[ -n "$uuid" && "$type" == wireguard ]] || continue
+    active_uuids["$uuid"]=1
+  done < <(nmcli -t -e no -f UUID,TYPE connection show --active)
+
+  while IFS=: read -r uuid type; do
+    [[ -n "$uuid" && "$type" == wireguard ]] || continue
+
+    name=$(nmcli -g connection.id connection show "$uuid")
+    if [[ -n "${active_uuids[$uuid]+x}" ]]; then
+      addresses=$(nmcli -g ipv4.addresses connection show "$uuid" 2>/dev/null \
+        | awk 'NF && $0 != "--" { values = values (values ? ", " : "") $0 } END { print values }')
+      detail=$name
+      [[ -z "$addresses" ]] || detail+=": $addresses"
+      connected_names+=("$name")
+      connected_details+=("$detail")
+    else
+      available_names+=("$name")
+    fi
+  done < <(nmcli -t -e no -f UUID,TYPE connection show)
+}
+
+join_by() {
+  local separator=$1 result='' item
+  shift
+
+  for item in "$@"; do
+    [[ -z "$result" ]] || result+=$separator
+    result+=$item
+  done
+
+  printf '%s' "$result"
+}
+
+print_waybar_json() {
+  local mode=$1 text tooltip
+
+  if [[ "$mode" == short ]]; then
+    text=$(join_by ' | ' "${connected_names[@]}")
+  else
+    text=$(join_by ' | ' "${connected_details[@]}")
+  fi
+  tooltip=$(printf '%s\n' "${connected_details[@]}")
+  tooltip=${tooltip%$'\n'}
+
+  jq -cn --arg text "$text" --arg tooltip "$tooltip" \
+    '{text: $text, tooltip: $tooltip}'
+}
+
+print_menu() {
+  local item
+  for item in "${connected_details[@]}"; do
+    printf 'connected: %s\n' "$item"
+  done
+  for item in "${available_names[@]}"; do
+    printf 'available: %s\n' "$item"
+  done
+}
+
+toggle_connection() {
+  local name=$1 uuid type
+
+  if ! uuid=$(nmcli -g connection.uuid connection show "$name"); then
+    printf 'ERROR: connection not found: %s\n' "$name" >&2
+    exit 1
+  fi
+  type=$(nmcli -g connection.type connection show "$uuid")
+  if [[ "$type" != wireguard ]]; then
+    printf 'ERROR: not a WireGuard connection: %s\n' "$name" >&2
+    exit 1
+  fi
+
+  if [[ -n "${active_uuids[$uuid]+x}" ]]; then
+    nmcli connection down uuid "$uuid"
+  else
+    nmcli connection up uuid "$uuid"
+  fi
+}
+
+load_connections
+
+case ${1:-} in
+  '') print_waybar_json full ;;
+  short) print_waybar_json short ;;
+  menu) print_menu ;;
+  toggle)
+    if (($# != 2)); then
+      printf 'Usage: %s toggle NAME\n' "${0##*/}" >&2
+      exit 2
+    fi
+    toggle_connection "$2"
+    ;;
+  *)
+    printf 'Usage: %s [short|menu|toggle NAME]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
