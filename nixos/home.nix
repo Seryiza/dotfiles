@@ -3,6 +3,7 @@ let
   chromeExecutable = pkgs.lib.getExe' pkgs.google-chrome "google-chrome-stable";
 in {
   imports = [
+    ./home/idle-lock.nix
     ./home/sway.nix
     ./home/mako.nix
     ./home/packages.nix

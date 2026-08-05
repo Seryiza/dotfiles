@@ -1,24 +1,4 @@
 { config, pkgs, nixpkgs-unstable, lib, ... }: {
-  services.swayidle = {
-    enable = true;
-
-    events = {
-      "before-sleep" = "${pkgs.swaylock}/bin/swaylock -fF -c 000000";
-    };
-
-    timeouts = [
-      {
-        timeout = 600;
-        command = "${pkgs.swaylock}/bin/swaylock -fF -c 000000";
-      }
-      {
-        timeout = 630;
-        command = ''swaymsg "output * power off"'';
-        resumeCommand = ''swaymsg "output * power on"'';
-      }
-    ];
-  };
-
   wayland.windowManager.sway = {
     enable = true;
     wrapperFeatures.gtk = true;

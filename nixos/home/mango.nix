@@ -90,6 +90,10 @@ in
           sloppyfocus = 0;
           focus_on_activate = 0;
 
+          # Honor media players' idle inhibitors even when Mango temporarily
+          # classifies their surface as invisible.
+          idleinhibit_ignore_visible = 1;
+
           bind = [
             "SUPER,Return,spawn,alacritty"
             "SUPER,Escape,spawn,${pkgs.swaylock}/bin/swaylock -c 000000"
