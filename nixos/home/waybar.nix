@@ -17,6 +17,15 @@ in
         (old: {
           src = waybar-src;
           nativeCheckInputs = (old.nativeCheckInputs or [ ]) ++ [ pkgs.xvfb-run ];
+          # The upstream SleeperThread stress test has a hard-coded five-second
+          # deadline and flakes on loaded Nix builders. Preserve the full test
+          # suite while allowing more time under constrained build scheduling.
+          postPatch = (old.postPatch or "") + ''
+            if [[ -f test/utils/sleeper_thread.cpp ]]; then
+              substituteInPlace test/utils/sleeper_thread.cpp \
+                --replace-warn "alarm(5);" "alarm(30);"
+            fi
+          '';
           patches = (old.patches or [ ]) ++ [
             ./waybar-mango-taskbar.patch
             ./waybar-mango-workspaces.patch
