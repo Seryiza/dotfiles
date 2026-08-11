@@ -46,7 +46,7 @@ in {
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  boot.kernelPackages = pkgs.linuxPackages;
+  boot.kernelPackages = unstable-pkgs.linuxPackagesFor unstable-pkgs.linux_latest;
   boot.kernelParams = [ ];
   boot.initrd.kernelModules = [ "amdgpu" ];
   boot.kernelModules = [ "amdxdna" ];
