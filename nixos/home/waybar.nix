@@ -47,7 +47,7 @@ in
         name = "right";
         layer = "top";
         position = "right";
-        width = 250;
+        width = 300;
         spacing = 0;
         modules-right-halign = {
           default = "fill";
