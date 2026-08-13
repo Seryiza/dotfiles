@@ -79,7 +79,7 @@ in
     pkgs.dropbox
     pkgs.bun
     pkgs.mission-center
-    unstable-pkgs.telegram-desktop
+    pkgs.telegram-desktop
     goose-desktop
     # unstable because of https://github.com/NixOS/nixpkgs/issues/500724
     unstable-pkgs.enpass

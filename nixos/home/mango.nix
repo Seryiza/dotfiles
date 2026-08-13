@@ -54,12 +54,6 @@ in
           );
           circle_layout = "scroller,tile,monocle";
 
-          # Keep Telegram's transient media viewer out of the scroller layout.
-          # Match both fields so the main Telegram window remains tiled.
-          windowrule = [
-            ''isfloating:1,appid:^org\.telegram\.desktop$,title:^Media viewer$''
-          ];
-
           # Scroller geometry and window-width presets.
           scroller_structs = 40;
           scroller_proportion_preset = "0.5,0.75,1.0";
