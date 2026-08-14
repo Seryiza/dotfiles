@@ -47,11 +47,10 @@ in {
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   boot.kernelPackages = unstable-pkgs.linuxPackagesFor unstable-pkgs.linux_latest;
-  boot.kernelParams = [ ];
-  boot.initrd.kernelModules = [ "amdgpu" ];
-  boot.kernelModules = [ "amdxdna" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ ];
   boot.supportedFilesystems = [ "ntfs" ];
-  boot.blacklistedKernelModules = [ "nouveau" "nvidiafb" ];
+  boot.blacklistedKernelModules = [ ];
   boot.kernelPatches = [ ];
 
   # Bootloader
@@ -407,6 +406,8 @@ in {
   hardware.uinput.enable = true;
   programs.ydotool.enable = true;
   services.udev = {
+    packages = [ pkgs.brightnessctl ];
+
     # NOTE: Xremap requires the following:
     # https://github.com/xremap/xremap?tab=readme-ov-file#running-xremap-without-sudo
     extraRules = ''
