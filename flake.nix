@@ -37,10 +37,6 @@
       flake = false;
     };
     zed.url = "github:zed-industries/zed/v1.10.1";
-    dirge = {
-      url = "github:dirge-code/dirge";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = { self, nixpkgs, home-manager, nur, emacs-lsp-booster, xremap, sysc-greet, mango, ...
@@ -56,6 +52,8 @@
               (final: prev: {
                 jdk = final.zulu21;
                 clojure = prev.clojure.override { jdk = final.zulu21; };
+                smooth-scroll-linux =
+                  final.callPackage ./nixos/pkgs/smooth-scroll-linux.nix { };
               })
             ];
           }

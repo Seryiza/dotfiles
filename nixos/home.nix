@@ -11,6 +11,7 @@ in {
     ./home/waybar.nix
     ./home/email.nix
     ./home/xremap.nix
+    ./home/smooth-scroll.nix
     ./home/emacs.nix
   ];
 

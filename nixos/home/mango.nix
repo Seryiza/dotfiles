@@ -79,8 +79,6 @@ in
           tap_to_click = 1;
           button_map = 0;
           trackpad_natural_scrolling = 1;
-          disable_while_typing = 1;
-          middle_button_emulation = 1;
           sloppyfocus = 0;
           focus_on_activate = 0;
 

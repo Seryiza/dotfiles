@@ -12,6 +12,22 @@ let
   };
   llm-agents-pkgs = inputs.llm-agents.packages.${system};
   goose-desktop = pkgs.callPackage ../pkgs/goose-desktop.nix { };
+  glamoroustoolkit-vm = unstable-pkgs.glamoroustoolkit.overrideAttrs (_: rec {
+    version = "1.1.67";
+    src = unstable-pkgs.fetchzip {
+      url = "https://github.com/feenkcom/gtoolkit-vm/releases/download/v${version}/GlamorousToolkit-x86_64-unknown-linux-gnu.zip";
+      stripRoot = false;
+      hash = "sha256-5vHOPJ0EZ0+G/849FCS5HLzq47CCD4eMpPh67n/698A=";
+    };
+  });
+  glamoroustoolkit = pkgs.buildEnv {
+    name = "glamoroustoolkit";
+    paths = [ glamoroustoolkit-vm ];
+    pathsToLink = [
+      "/bin"
+      "/share"
+    ];
+  };
   jan-wayland = pkgs.symlinkJoin {
     name = "jan-wayland";
     paths = [ unstable-pkgs.jan ];
@@ -51,6 +67,7 @@ in
   home.packages = [
     pkgs.httpie
     pkgs.gnumake
+    pkgs.smooth-scroll-linux
     pkgs.sops
 
     (pkgs.iosevka-bin.override { variant = "SGr-Iosevka"; })
@@ -81,6 +98,7 @@ in
     pkgs.mission-center
     pkgs.telegram-desktop
     goose-desktop
+    glamoroustoolkit
     # unstable because of https://github.com/NixOS/nixpkgs/issues/500724
     unstable-pkgs.enpass
     pkgs.postgresql_17
@@ -151,7 +169,6 @@ in
     pkgs.babashka
     pkgs.emacs-lsp-booster
     inputs.zed.packages.${system}.default
-    inputs.dirge.packages.${system}.default
     pkgs.htop
     pkgs.rocmPackages.rocminfo
     pkgs.rocmPackages.rocm-smi

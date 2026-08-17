@@ -1,0 +1,55 @@
+# Smooth Scroll Linux v1.4.0
+# https://github.com/Wayne6530/smooth-scroll-linux
+# @config_version: 5
+
+# Logitech ERGO M575. Unlike /dev/input/eventN, this path is stable across boots.
+device = "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-mouse"
+
+# Keep extra mouse-button modes disabled initially so right and middle clicks
+# retain their normal behavior.
+free_spin_button = 0
+drag_view_button = 0
+
+# Scroll
+# Fast profile with globally reduced output distance. Speed Mode has no
+# per-tick floor; wheel_tick_distance is only a mode fallback.
+smooth_mode = 0
+wheel_tick_distance = 158
+damping = 11.7
+min_deceleration = 36000
+# Scale speed, braking, and burst thresholds together to reduce every scenario
+# by about 20% without changing animation timing.
+max_deceleration = 432000
+initial_speed = 3000
+speed_factor = 384
+
+# Braking
+# In v1.4.0 reverse braking deliberately swallows up to three wheel events
+# after a direction change, which feels like the wheel has stopped responding.
+use_reverse_scroll_braking = false
+max_reverse_scroll_braking_microseconds = 100000
+max_reverse_scroll_braking_times = 3
+reverse_scroll_intent_window_microseconds = 200000
+use_mouse_movement_braking = false
+max_mouse_movement_distance = 30
+mouse_movement_window_milliseconds = 20
+mouse_movement_delay_microseconds = 100000
+keyboard_braking_keys = [42, 54]
+keyboard_passthrough_keys = [29, 97, 125, 126]
+
+# Drag view
+drag_view_activation_mode = 0
+drag_view_click_timeout_milliseconds = 200
+drag_view_speed = 3
+
+# Advanced
+# 8 ms provides 125 updates/second while the ~80 ms Single animation avoids
+# the long high-frequency event stream that made WebKit unresponsive.
+tick_interval_microseconds = 8000
+speed_smooth_window_microseconds = 200000
+# Cap acceleration during tightly spaced input: Multi-Burst loses about 29%
+# while Single/Slow stay unchanged and Fast remains within about 10%.
+max_speed_change_lowerbound = 400
+min_speed_change_upperbound = 6400
+min_speed_change_ratio = 0.05
+max_speed_change_ratio = 0.3
