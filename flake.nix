@@ -36,16 +36,46 @@
     zed.url = "github:zed-industries/zed/v1.10.1";
   };
 
-  outputs = { self, nixpkgs, home-manager, nur, emacs-lsp-booster, xremap, sysc-greet, mango, ...
-    }@inputs: {
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      home-manager,
+      nur,
+      emacs-lsp-booster,
+      xremap,
+      sysc-greet,
+      mango,
+      ...
+    }@inputs:
+    let
+      system = "x86_64-linux";
+      unstablePackages = nixpkgs-unstable.legacyPackages.${system};
+      riverOverlay = final: prev: {
+        river = unstablePackages.river;
+        machi = final.callPackage ./nixos/pkgs/machi.nix { };
+        channel = final.callPackage ./nixos/pkgs/channel.nix { };
+      };
+      packages = import nixpkgs {
+        inherit system;
+        overlays = [ riverOverlay ];
+      };
+    in
+    {
+      packages.${system} = {
+        inherit (packages) river machi channel;
+      };
+
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
+        inherit system;
         specialArgs = inputs;
         modules = [
           {
             nixpkgs.overlays = [
               nur.overlays.default
               emacs-lsp-booster.overlays.default
+              riverOverlay
               (final: prev: {
                 jdk = final.zulu21;
                 clojure = prev.clojure.override { jdk = final.zulu21; };
