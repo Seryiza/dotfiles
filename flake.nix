@@ -82,6 +82,16 @@
           river-session-policy = packages.callPackage ./nixos/tests/river-session-policy.nix (
             yuriArtifacts // { inherit (packages) river machi channel; }
           );
+
+          soteria-session-agent = packages.callPackage ./nixos/tests/soteria-session-agent.nix (
+            yuriArtifacts
+            // {
+              inherit (packages) soteria;
+              configuredPackages =
+                self.nixosConfigurations.yuri-alpha.config.environment.systemPackages
+                ++ self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.packages;
+            }
+          );
         };
 
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {

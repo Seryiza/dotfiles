@@ -190,6 +190,7 @@ in {
 
   security.rtkit.enable = true;
   security.polkit.enable = true;
+  security.soteria.enable = true;
 
   # sudo
   security.sudo.extraConfig = ''
@@ -349,6 +350,8 @@ in {
   # Keep the active UWSM session alive when package upgrades change its
   # template units. The updated units take effect after logout or reboot.
   systemd.user.services = {
+    polkit-soteria.bindsTo = [ "graphical-session.target" ];
+
     "wayland-session-bindpid@" = {
       overrideStrategy = "asDropin";
       enableDefaultPath = false;
