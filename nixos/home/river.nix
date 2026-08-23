@@ -68,7 +68,7 @@ in
 
       xdg.configFile."machi/machi.ini".text = ''
         [geometry]
-        gap-size=10
+        gap-size=16
         border-width=2
 
         [cursor]
