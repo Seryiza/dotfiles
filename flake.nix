@@ -59,6 +59,7 @@
         machi = final.callPackage ./nixos/pkgs/machi.nix { };
         channel = final.callPackage ./nixos/pkgs/channel.nix { };
         zelbar = final.callPackage ./nixos/pkgs/zelbar.nix { };
+        river-zelbar-status = final.callPackage ./nixos/pkgs/river-zelbar-status { };
       };
       packages = import nixpkgs {
         inherit system;
@@ -67,7 +68,7 @@
     in
     {
       packages.${system} = {
-        inherit (packages) river machi channel zelbar;
+        inherit (packages) river machi channel zelbar river-zelbar-status;
       };
 
       checks.${system} =
@@ -93,6 +94,8 @@
           zelbar-package = packages.callPackage ./nixos/tests/zelbar-package.nix {
             inherit (packages) zelbar;
           };
+
+          river-zelbar-status = packages.river-zelbar-status;
 
           river-xkb-shortcuts =
             packages.callPackage ./nixos/tests/river-xkb-shortcuts.nix yuriArtifacts;
