@@ -16,19 +16,12 @@ in
 
     settings = [
       {
-        name = "right";
+        name = "top";
         layer = "top";
-        position = "right";
-        width = 300;
+        position = "top";
+        height = barHeight;
         spacing = 0;
-        modules-right-halign = {
-          default = "fill";
-          privacy = "start";
-        };
-        modules-left = [
-          "mango/workspaces"
-          "mango/taskbar"
-        ];
+        modules-left = [ "mango/window" ];
         modules-center = [ ];
         modules-right = [
           "custom/org_timeblock"
@@ -37,7 +30,6 @@ in
           "wireplumber"
           "network"
           "custom/wireguard"
-          "sway/language"
           "mango/language"
           "battery"
           "clock"
@@ -62,17 +54,6 @@ in
           on-click = "activate";
           on-click-middle = "close";
           on-click-right = "minimize";
-        };
-
-        "mango/workspaces" = {
-          orientation = "horizontal";
-          homogeneous = true;
-          height = barHeight;
-          format = "{icon}";
-          hide-empty = false;
-          on-click = "activate";
-          on-click-right = "toggle";
-          overview-label = "OVERVIEW";
         };
 
         "custom/org_timeblock" = {
@@ -202,6 +183,28 @@ in
           tooltip-format = "{node_name}: {volume}%{format_source}";
         };
 
+      }
+
+      {
+        name = "bottom";
+        layer = "top";
+        position = "bottom";
+        height = barHeight;
+        spacing = 0;
+        modules-left = [ "mango/workspaces" ];
+        modules-center = [ ];
+        modules-right = [ ];
+
+        "mango/workspaces" = {
+          orientation = "horizontal";
+          homogeneous = true;
+          height = barHeight;
+          format = "{icon}";
+          hide-empty = false;
+          on-click = "activate";
+          on-click-right = "toggle";
+          overview-label = "OVERVIEW";
+        };
       }
 
       # {

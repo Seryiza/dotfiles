@@ -164,6 +164,10 @@ button.active:hover,
     margin: 0;
 }
 
+window#waybar.top #window {
+    margin-left: 6px;
+}
+
 /* If workspaces is the leftmost module, omit left margin */
 .modules-left > widget:first-child > #workspaces {
     margin-left: 0;
