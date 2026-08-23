@@ -67,6 +67,13 @@
         inherit (packages) river machi channel;
       };
 
+      checks.${system}.waybar-session-profiles =
+        packages.callPackage ./nixos/tests/waybar-session-profiles.nix {
+          homeGeneration =
+            self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.activationPackage;
+          toplevel = self.nixosConfigurations.yuri-alpha.config.system.build.toplevel;
+        };
+
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = inputs;
