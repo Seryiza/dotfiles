@@ -58,6 +58,7 @@
         };
         machi = final.callPackage ./nixos/pkgs/machi.nix { };
         channel = final.callPackage ./nixos/pkgs/channel.nix { };
+        zelbar = final.callPackage ./nixos/pkgs/zelbar.nix { };
       };
       packages = import nixpkgs {
         inherit system;
@@ -66,7 +67,7 @@
     in
     {
       packages.${system} = {
-        inherit (packages) river machi channel;
+        inherit (packages) river machi channel zelbar;
       };
 
       checks.${system} =
@@ -87,6 +88,10 @@
 
           river-decoration-globals = packages.callPackage ./nixos/tests/river-decoration-globals.nix {
             inherit (packages) river;
+          };
+
+          zelbar-package = packages.callPackage ./nixos/tests/zelbar-package.nix {
+            inherit (packages) zelbar;
           };
 
           river-xkb-shortcuts =
