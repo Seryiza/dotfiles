@@ -25,6 +25,10 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-AIP5SO7p2Z8fYeLSoIliSya2fQALV1xkkYfIRdHY6TQ=";
   };
 
+  # Channel 0.4.1 does not expose River's tap-button-map protocol request.
+  # Keep the pinned release as the source while adding the missing policy knob.
+  patches = [ ./channel-tap-button-map.patch ];
+
   zigDeps = zig.fetchDeps {
     inherit (finalAttrs) src pname version;
     fetchAll = true;

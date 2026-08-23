@@ -67,11 +67,21 @@
         inherit (packages) river machi channel;
       };
 
-      checks.${system}.waybar-session-profiles =
-        packages.callPackage ./nixos/tests/waybar-session-profiles.nix {
-          homeGeneration =
-            self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.activationPackage;
-          toplevel = self.nixosConfigurations.yuri-alpha.config.system.build.toplevel;
+      checks.${system} =
+        let
+          yuriArtifacts = {
+            homeGeneration =
+              self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.activationPackage;
+            toplevel = self.nixosConfigurations.yuri-alpha.config.system.build.toplevel;
+          };
+        in
+        {
+          waybar-session-profiles =
+            packages.callPackage ./nixos/tests/waybar-session-profiles.nix yuriArtifacts;
+
+          river-session-policy = packages.callPackage ./nixos/tests/river-session-policy.nix (
+            yuriArtifacts // { inherit (packages) river machi channel; }
+          );
         };
 
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {
@@ -95,6 +105,7 @@
           ./nixos/configuration.nix
           sysc-greet.nixosModules.default
           (import ./nixos/home/mango.nix { inherit mango; }).nixosModule
+          (import ./nixos/home/river.nix).nixosModule
 
           home-manager.nixosModules.home-manager
           {
@@ -104,6 +115,7 @@
             home-manager.users.seryiza = {
               imports = [
                 (import ./nixos/home/mango.nix { inherit mango; }).homeManagerModule
+                (import ./nixos/home/river.nix).homeManagerModule
                 ./nixos/home.nix
               ];
             };

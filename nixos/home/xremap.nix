@@ -10,7 +10,6 @@
     config.modmap = [{
       name = "Global";
       remap = {
-        "CapsLock" = "Control_L";
         "KEY_F23" = "Control_R";
       };
     }];

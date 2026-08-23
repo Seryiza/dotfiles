@@ -1,0 +1,41 @@
+diff --git a/src/libinput_device.zig b/src/libinput_device.zig
+index f50578a..8d553be 100644
+--- a/src/libinput_device.zig
++++ b/src/libinput_device.zig
+@@ -128,6 +128,7 @@ pub fn listener(dev: *rwm.LibinputDeviceV1, event: rwm.LibinputDeviceV1.Event, m
+         },
+         .natural_scroll_default => |nat_scroll| data.defaults.natural_scroll = nat_scroll.state == .enabled,
+         .tap_default => |tap| data.defaults.tap_to_click = tap.state == .enabled,
++        .tap_button_map_default => |map| data.defaults.tap_button_map = map.button_map,
+         .dwt_default => |dwt| data.defaults.disable_while_typing = dwt.state == .enabled,
+         .dwtp_default => |dwtp| data.defaults.disable_while_trackpointing = dwtp.state == .enabled,
+         .left_handed_default => |lh| data.defaults.left_handed = lh.state == .enabled,
+@@ -146,6 +147,7 @@ pub fn listener(dev: *rwm.LibinputDeviceV1, event: rwm.LibinputDeviceV1.Event, m
+         .natural_scroll_current,
+         .click_method_current,
+         .tap_current,
++        .tap_button_map_current,
+         .dwt_current,
+         .dwtp_current,
+         .left_handed_current,
+diff --git a/src/profile.zig b/src/profile.zig
+index 3156308..9795d42 100644
+--- a/src/profile.zig
++++ b/src/profile.zig
+@@ -177,5 +177,6 @@ pub const LibInput = struct {
+     natural_scroll: bool = true,
+     tap_to_click: bool = false,
++    tap_button_map: LibDev.TapButtonMap = .lrm,
+     disable_while_typing: bool = false,
+     disable_while_trackpointing: bool = false,
+     left_handed: bool = false,
+@@ -254,6 +255,9 @@ pub fn apply(self: @This(), man: *Manager, dev: *rwm.InputDeviceV1) !void {
+             if (conf.tap_to_click orelse defts.tap_to_click) |ttc| handle(man, try libdev.setTap(
+                 if (ttc) .enabled else .disabled,
+             ));
++        if (caps.tap > 0)
++            if (conf.tap_button_map orelse defts.tap_button_map) |map|
++                handle(man, try libdev.setTapButtonMap(map));
+         if (caps.disable_while_typing)
+             if (conf.disable_while_typing orelse defts.disable_while_typing) |dwt|
+                 handle(man, try libdev.setDwt(
