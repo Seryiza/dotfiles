@@ -83,34 +83,28 @@ in
         [keybindings.wm]
         reload-config=super+ctrl+shift+r
 
-        [keybindings.output]
+        [keybindings.workspace]
         cycle-next=super+comma
         cycle-prev=super+period
-
-        [keybindings.workspace]
-        cycle-next=super+j
-        cycle-prev=super+k
-        add-next=super+ctrl+j
-        add-prev=super+ctrl+k
-        move-to-next-output=super+shift+comma
-        move-to-prev-output=super+shift+period
+        add-next=super+ctrl+comma
+        add-prev=super+ctrl+period
 
         [keybindings.panel]
         cycle-next=super+l
         cycle-prev=super+h
-        add-next=super+ctrl+l
-        add-prev=super+ctrl+h
-        move-to-next-workspace=super+shift+j
-        move-to-prev-workspace=super+shift+k
-        move-to-next-new-workspace=super+ctrl+shift+j
-        move-to-prev-new-workspace=super+ctrl+shift+k
+        add-next=super+alt+l
+        add-prev=super+alt+h
+        move-to-next-workspace=super+shift+comma
+        move-to-prev-workspace=super+shift+period
+        move-to-next-new-workspace=super+ctrl+shift+comma
+        move-to-prev-new-workspace=super+ctrl+shift+period
         toggle-split-view=super+s
 
         [keybindings.window]
-        cycle-next=super+n
-        cycle-prev=super+p
-        move-next=super+shift+n
-        move-prev=super+shift+p
+        cycle-next=super+k
+        cycle-prev=super+j
+        move-next=super+shift+k
+        move-prev=super+shift+j
         split-toggle=super+tab
         split-swap=super+shift+tab
         move-to-next-panel=super+shift+l
@@ -124,7 +118,7 @@ in
         alacritty=super+return
         ${pkgs.swaylock}/bin/swaylock -c 000000=super+escape
         ${pkgs.uwsm}/bin/uwsm stop=super+shift+e
-        ${pkgs.wmenu}/bin/wmenu-run -i -b -l 10 -f 'Iosevka 14'=super+space
+        ${pkgs.wmenu}/bin/wmenu-run -i -b -l 10 -f 'Iosevka 14'=super+n
         emacsclient -c=super+m
         firefox=super+b
         run-work-browser=super+shift+b
