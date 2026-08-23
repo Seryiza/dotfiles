@@ -53,7 +53,9 @@
       system = "x86_64-linux";
       unstablePackages = nixpkgs-unstable.legacyPackages.${system};
       riverOverlay = final: prev: {
-        river = unstablePackages.river;
+        river = final.callPackage ./nixos/pkgs/river.nix {
+          river = unstablePackages.river;
+        };
         machi = final.callPackage ./nixos/pkgs/machi.nix { };
         channel = final.callPackage ./nixos/pkgs/channel.nix { };
       };
@@ -82,6 +84,10 @@
           river-session-policy = packages.callPackage ./nixos/tests/river-session-policy.nix (
             yuriArtifacts // { inherit (packages) river machi channel; }
           );
+
+          river-decoration-globals = packages.callPackage ./nixos/tests/river-decoration-globals.nix {
+            inherit (packages) river;
+          };
 
           soteria-session-agent = packages.callPackage ./nixos/tests/soteria-session-agent.nix (
             yuriArtifacts

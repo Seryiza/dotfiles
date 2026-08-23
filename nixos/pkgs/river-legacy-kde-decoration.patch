@@ -1,0 +1,44 @@
+diff --git a/build.zig b/build.zig
+index 318f93f..0940d43 100644
+--- a/build.zig
++++ b/build.zig
+@@ -163,2 +163,3 @@ pub fn build(b: *Build) !void {
+     translate_c.linkSystemLibrary("libevdev", .{});
++    translate_c.linkSystemLibrary(wlroots_pkgconf, .{});
+     translate_c.linkSystemLibrary("libinput", .{});
+diff --git a/river/Server.zig b/river/Server.zig
+index 36ee27d..61fc8a1 100644
+--- a/river/Server.zig
++++ b/river/Server.zig
+@@ -7,2 +7,3 @@ const build_options = @import("build_options");
+ const std = @import("std");
++const c = @import("c");
+ const assert = std.debug.assert;
+@@ -72,2 +73,3 @@ xdg_shell: *wlr.XdgShell,
+ xdg_decoration_manager: *wlr.XdgDecorationManagerV1,
++server_decoration_manager: *c.struct_wlr_server_decoration_manager,
+ xdg_activation: *wlr.XdgActivationV1,
+@@ -160,2 +162,8 @@ pub fn init(server: *Server, runtime_xwayland: bool) !void {
+         .xdg_decoration_manager = try wlr.XdgDecorationManagerV1.create(wl_server),
++        .server_decoration_manager = blk: {
++            const manager = c.wlr_server_decoration_manager_create(@ptrCast(wl_server));
++            if (manager == null) return error.OutOfMemory;
++            c.wlr_server_decoration_manager_set_default_mode(manager, c.WLR_SERVER_DECORATION_MANAGER_MODE_SERVER);
++            break :blk @ptrCast(manager);
++        },
+         .xdg_activation = try wlr.XdgActivationV1.create(wl_server),
+@@ -353,2 +361,5 @@ fn allowlist(server: *Server, global: *const wl.Global) bool {
+         global == server.xdg_decoration_manager.global or
++        global == @as(*const wl.Global, @ptrCast(
++            server.server_decoration_manager.global,
++        )) or
+         global == server.xdg_activation.global or
+diff --git a/river/c.h b/river/c.h
+index a13f2b0..0d3218c 100644
+--- a/river/c.h
++++ b/river/c.h
+@@ -4,2 +4,4 @@
+ #include <linux/input-event-codes.h>
++#define WLR_USE_UNSTABLE
++#include <wlr/types/wlr_server_decoration.h>
+ #include <libevdev/libevdev.h>
