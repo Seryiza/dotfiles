@@ -137,13 +137,17 @@ in
         toggle-audio-mute && display-current-volume=super+shift+m
       '';
 
+      xdg.configFile."xkb/rules/evdev".source = ../xkb/rules/evdev;
+      xdg.configFile."xkb/types/custom".source = ../xkb/types/custom;
+      xdg.configFile."xkb/symbols/custom".source = ../xkb/symbols/custom;
+
       xdg.configFile."river/config.rh".text = ''
         input {
             profiles {
                 keyboard {
                     keyboard {
                         layout us,ru
-                        options ctrl:nocaps,grp:ctrl_space_toggle
+                        options grp:ctrl_space_toggle,custom:types,custom:positional-latin-shortcuts
                     }
                 }
 

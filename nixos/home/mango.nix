@@ -77,7 +77,7 @@ in
           cursor_size = config.home.pointerCursor.size;
 
           xkb_rules_layout = "us,ru";
-          xkb_rules_options = "ctrl:nocaps,grp:ctrl_space_toggle";
+          xkb_rules_options = "grp:ctrl_space_toggle";
 
           tap_to_click = 1;
           button_map = 0;

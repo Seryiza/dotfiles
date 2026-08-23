@@ -1,0 +1,7 @@
+! include %S/evdev
+
+! option = types
+  custom:types = +custom
+
+! option = symbols
+  custom:positional-latin-shortcuts = +custom(positional_latin_shortcuts):2

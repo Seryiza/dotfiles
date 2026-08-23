@@ -1,0 +1,109 @@
+partial alphanumeric_keys
+xkb_symbols "positional_latin_shortcuts" {
+    key <AD01> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_shorti, Cyrillic_SHORTI, q ]
+    };
+    key <AD02> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_tse, Cyrillic_TSE, w ]
+    };
+    key <AD03> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_u, Cyrillic_U, e ]
+    };
+    key <AD04> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ka, Cyrillic_KA, r ]
+    };
+    key <AD05> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ie, Cyrillic_IE, t ]
+    };
+    key <AD06> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_en, Cyrillic_EN, y ]
+    };
+    key <AD07> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ghe, Cyrillic_GHE, u ]
+    };
+    key <AD08> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_sha, Cyrillic_SHA, i ]
+    };
+    key <AD09> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_shcha, Cyrillic_SHCHA, o ]
+    };
+    key <AD10> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ze, Cyrillic_ZE, p ]
+    };
+
+    key <AC01> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ef, Cyrillic_EF, a ]
+    };
+    key <AC02> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_yeru, Cyrillic_YERU, s ]
+    };
+    key <AC03> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ve, Cyrillic_VE, d ]
+    };
+    key <AC04> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_a, Cyrillic_A, f ]
+    };
+    key <AC05> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_pe, Cyrillic_PE, g ]
+    };
+    key <AC06> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_er, Cyrillic_ER, h ]
+    };
+    key <AC07> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_o, Cyrillic_O, j ]
+    };
+    key <AC08> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_el, Cyrillic_EL, k ]
+    };
+    key <AC09> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_de, Cyrillic_DE, l ]
+    };
+
+    key <AB01> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ya, Cyrillic_YA, z ]
+    };
+    key <AB02> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_che, Cyrillic_CHE, x ]
+    };
+    key <AB03> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_es, Cyrillic_ES, c ]
+    };
+    key <AB04> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_em, Cyrillic_EM, v ]
+    };
+    key <AB05> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_i, Cyrillic_I, b ]
+    };
+    key <AB06> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_te, Cyrillic_TE, n ]
+    };
+    key <AB07> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_softsign, Cyrillic_SOFTSIGN, m ]
+    };
+};

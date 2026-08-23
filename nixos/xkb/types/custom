@@ -1,0 +1,47 @@
+default partial xkb_types "positional_latin_shortcuts" {
+    type "POSITIONAL_LATIN_SHORTCUT" {
+        modifiers = Shift + Control + Mod1 + Mod4;
+
+        map[None] = Level1;
+        map[Shift] = Level2;
+
+        map[Control] = Level3;
+        preserve[Control] = Control;
+        map[Shift+Control] = Level3;
+        preserve[Shift+Control] = Shift+Control;
+
+        map[Mod1] = Level3;
+        preserve[Mod1] = Mod1;
+        map[Shift+Mod1] = Level3;
+        preserve[Shift+Mod1] = Shift+Mod1;
+
+        map[Mod4] = Level3;
+        preserve[Mod4] = Mod4;
+        map[Shift+Mod4] = Level3;
+        preserve[Shift+Mod4] = Shift+Mod4;
+
+        map[Control+Mod1] = Level3;
+        preserve[Control+Mod1] = Control+Mod1;
+        map[Shift+Control+Mod1] = Level3;
+        preserve[Shift+Control+Mod1] = Shift+Control+Mod1;
+
+        map[Control+Mod4] = Level3;
+        preserve[Control+Mod4] = Control+Mod4;
+        map[Shift+Control+Mod4] = Level3;
+        preserve[Shift+Control+Mod4] = Shift+Control+Mod4;
+
+        map[Mod1+Mod4] = Level3;
+        preserve[Mod1+Mod4] = Mod1+Mod4;
+        map[Shift+Mod1+Mod4] = Level3;
+        preserve[Shift+Mod1+Mod4] = Shift+Mod1+Mod4;
+
+        map[Control+Mod1+Mod4] = Level3;
+        preserve[Control+Mod1+Mod4] = Control+Mod1+Mod4;
+        map[Shift+Control+Mod1+Mod4] = Level3;
+        preserve[Shift+Control+Mod1+Mod4] = Shift+Control+Mod1+Mod4;
+
+        level_name[Level1] = "Cyrillic";
+        level_name[Level2] = "Shift Cyrillic";
+        level_name[Level3] = "Positional Latin shortcut";
+    };
+};

@@ -8,7 +8,10 @@
 }:
 pkgs.runCommand "river-session-policy-check"
   {
-    nativeBuildInputs = [ pkgs.python3 ];
+    nativeBuildInputs = [
+      pkgs.libxkbcommon
+      pkgs.python3
+    ];
   }
   ''
     sessions=${toplevel}/sw/share/wayland-sessions
@@ -78,17 +81,44 @@ pkgs.runCommand "river-session-policy-check"
     grep -F 'toggle-audio-mute && display-current-volume=super+shift+m' "$machi_config"
 
     grep -F 'layout us,ru' "$channel_config"
-    grep -F 'options ctrl:nocaps,grp:ctrl_space_toggle' "$channel_config"
+    grep -F 'options grp:ctrl_space_toggle,custom:types,custom:positional-latin-shortcuts' "$channel_config"
+    ! grep -F 'ctrl:nocaps' "$channel_config"
     grep -F 'tap_to_click true' "$channel_config"
     grep -F 'natural_scroll true' "$channel_config"
     grep -F 'disable_while_typing true' "$channel_config"
     grep -F 'tap_button_map lrm' "$channel_config"
     grep -F 'middle_mouse_emulation true' "$channel_config"
 
+    mango_config="$home_files/.config/mango/config.conf"
+    sway_config="$home_files/.config/sway/config"
+    grep -F 'xkb_rules_options = grp:ctrl_space_toggle' "$mango_config"
+    grep -F 'xkb_options grp:ctrl_space_toggle' "$sway_config"
+    ! grep -F 'ctrl:nocaps' "$mango_config" "$sway_config"
+
+    xkb_root="$home_files/.config/xkb"
+    test -f "$xkb_root/rules/evdev"
+    test -f "$xkb_root/types/custom"
+    test -f "$xkb_root/symbols/custom"
+    grep -F '! include %S/evdev' "$xkb_root/rules/evdev"
+    grep -F 'custom:types' "$xkb_root/rules/evdev"
+    grep -F 'custom:positional-latin-shortcuts' "$xkb_root/rules/evdev"
+    grep -F 'type "POSITIONAL_LATIN_SHORTCUT"' "$xkb_root/types/custom"
+    ! grep -E 'Mod5|LevelThree' "$xkb_root/types/custom"
+    test "$(grep -c 'type\[Group1\] = "POSITIONAL_LATIN_SHORTCUT"' "$xkb_root/symbols/custom")" -eq 26
+
+    ${pkgs.libxkbcommon}/bin/xkbcli compile-keymap \
+      --include "$xkb_root" \
+      --include-defaults \
+      --test \
+      --layout us,ru \
+      --options grp:ctrl_space_toggle,custom:types,custom:positional-latin-shortcuts \
+      >/dev/null
+
     xremap_unit="$home_files/.config/systemd/user/xremap.service"
     xremap_config=$(${pkgs.gnused}/bin/sed -n 's|^ExecStart=.* \(/nix/store/[^ ]*-config.yml\)$|\1|p' "$xremap_unit")
     test -f "$xremap_config"
-    ! grep -F 'CapsLock' "$xremap_config"
+    grep -F 'CapsLock' "$xremap_config"
+    grep -F 'Control_L' "$xremap_config"
     grep -F 'KEY_F23' "$xremap_config"
     grep -F 'C-KEY_LEFTBRACE' "$xremap_config"
 

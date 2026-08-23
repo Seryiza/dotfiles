@@ -89,6 +89,9 @@
             inherit (packages) river;
           };
 
+          river-xkb-shortcuts =
+            packages.callPackage ./nixos/tests/river-xkb-shortcuts.nix yuriArtifacts;
+
           soteria-session-agent = packages.callPackage ./nixos/tests/soteria-session-agent.nix (
             yuriArtifacts
             // {
