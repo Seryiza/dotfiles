@@ -51,6 +51,13 @@ There is one River entry, it launches through `uwsm start`, and no plain `river.
 
 No automated blocker remains.
 
+### Final pre-activation revalidation
+
+Immediately before the production pilot, the package builds, all three focused
+checks, the complete `yuri-alpha` toplevel build, and `nix flake check` passed
+again. `nix path-info` still resolves the configuration to the exact candidate
+toplevel recorded above, so no newer or unverified generation supersedes it.
+
 ## Human installation and runtime checklist
 
 Do not switch the running graphical session to this candidate. From a TTY or an existing stable session, install the exact already-built artifact for the next boot:
