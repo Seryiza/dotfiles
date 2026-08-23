@@ -48,21 +48,24 @@ in
 
           monitorrule = "name:^eDP-1$,width:2560,height:1600,refresh:240,x:0,y:0,scale:2";
 
-          # Mango assigns layouts per tag. Make monocle the initial layout on every tag.
-          tagrule = map (tag: "id:${toString tag},layout_name:monocle") (
+          # Mango assigns layouts per tag
+          tagrule = map (tag: "id:${toString tag},layout_name:scroller") (
             builtins.genList (index: index + 1) 9
           );
           circle_layout = "scroller,tile,monocle";
 
           # Scroller geometry and window-width presets.
-          scroller_structs = 40;
+          scroller_structs = 20;
           scroller_proportion_preset = "0.5,0.75,1.0";
+          scroller_default_proportion = "0.5";
 
-          gappih = 6;
-          gappiv = 6;
-          gappoh = 0;
-          gappov = 0;
-          borderpx = 3;
+          warpcursor = "0";
+
+          gappih = 10;
+          gappiv = 10;
+          gappoh = 10;
+          gappov = 10;
+          borderpx = 2;
           rootcolor = "0xffffffff";
           bordercolor = "0xd3d3d3ff";
           focuscolor = "0x000000ff";
@@ -95,14 +98,14 @@ in
             "SUPER,Tab,toggleoverview"
             "SUPER+SHIFT,Tab,togglejump"
             "SUPER,bracketleft,switch_layout"
-            "SUPER,j,focusstack,next"
-            "SUPER,k,focusstack,prev"
+            "SUPER,h,focusdir,left"
+            "SUPER,l,focusdir,right"
+            "SUPER,j,focusdir,down"
+            "SUPER,k,focusdir,up"
             "SUPER+ALT,j,exchange_stack_client,next"
             "SUPER+ALT,k,exchange_stack_client,prev"
-            "SUPER,l,viewtoright,0"
-            "SUPER,h,viewtoleft,0"
-            "SUPER+ALT,l,tagtoright,0"
-            "SUPER+ALT,h,tagtoleft,0"
+            "SUPER+ALT,h,viewtoleft,0"
+            "SUPER+ALT,l,viewtoright,0"
             "SUPER,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER+ALT,n,spawn,wmenu-run -i -b -l 10 -f 'Iosevka 14'"
             "SUPER,m,spawn,emacsclient -c"
@@ -110,11 +113,7 @@ in
             "SUPER+SHIFT,b,spawn,run-work-browser"
             "SUPER,e,spawn,env QT_QPA_PLATFORM=xcb Enpass"
           ]
-          ++ builtins.concatMap (tag: [
-            "SUPER,${toString tag},view,${toString tag},0"
-            "ALT,${toString tag},tag,${toString tag},0"
-            "ALT+SHIFT,${toString tag},toggletag,${toString tag}"
-          ]) (builtins.genList (index: index + 1) 9)
+          ++ map (tag: "SUPER,${toString tag},view,${toString tag},0") (builtins.genList (index: index + 1) 9)
           ++ [
             ''NONE,Print,spawn_shell,grim -g "$(slurp)" - | wl-copy''
             ''CTRL,Print,spawn_shell,grim -g "$(slurp)"''
