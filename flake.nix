@@ -32,10 +32,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     mango.url = "github:mangowm/mango";
-    waybar-src = {
-      url = "github:Alexays/Waybar/d44a27af1023b5c68f6f61435ba550bf03f69938";
-      flake = false;
-    };
+    waybar.url = "github:Alexays/Waybar/09e69e0f48214a1128d62417612bc47e8dc9e36a";
     zed.url = "github:zed-industries/zed/v1.10.1";
   };
 
