@@ -95,6 +95,10 @@
             inherit (packages) zelbar;
           };
 
+          zelbar-hidpi = packages.callPackage ./nixos/tests/zelbar-hidpi.nix {
+            inherit (packages) zelbar river machi;
+          };
+
           zelbar-runtime = packages.callPackage ./nixos/tests/zelbar-runtime.nix {
             inherit (packages) zelbar river-zelbar-status;
           };

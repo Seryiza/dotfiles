@@ -52,7 +52,7 @@ buildGoModule {
   checkFlags = lib.optionals stdenv.hostPlatform.isLinux [ "-race" ];
 
   meta = {
-    description = "Supervised River status producer for unmodified Zelbar";
+    description = "Supervised River status producer for pinned Zelbar";
     mainProgram = "river-zelbar-status";
     platforms = lib.platforms.linux;
   };

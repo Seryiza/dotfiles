@@ -1,0 +1,297 @@
+diff --git a/src/Backend.zig b/src/Backend.zig
+index fd1936a..2c5804a 100644
+--- a/src/Backend.zig
++++ b/src/Backend.zig
+@@ -29,6 +29,7 @@ const wp = wayland.client.wp;
+ const zwlr = wayland.client.zwlr;
+
+ const Bar = @import("Bar.zig");
++const Scale = @import("Scale.zig");
+ const ctx = &@import("main.zig").context;
+ const Backend = @This();
+
+@@ -41,7 +42,9 @@ const Output = struct {
+     wl_name: u32,
+
+     name: ?[]const u8 = null,
+-    // TODO: scale
++    scale: Scale.Factor = .one,
++    pending_scale: Scale.Factor = .one,
++    selected: bool = false,
+
+     configured: bool = false,
+
+@@ -68,9 +71,19 @@ const Output = struct {
+     fn output_listener(_: *wl.Output, event: wl.Output.Event, output: *Output) void {
+         switch (event) {
+             .done => {
+-                log.info("output {?s} configured", .{output.name});
++                if (output.scale.value != output.pending_scale.value and output.selected) {
++                    ctx.bar.set_scale(output.pending_scale) catch |err| {
++                        ctx.fatal(.backend, "failed to apply output scale: {s}", .{@errorName(err)});
++                    };
++                    if (ctx.backend.surface) |*surface| surface.set_dirty();
++                }
++                output.scale = output.pending_scale;
++                log.info("output {?s} configured at scale {}", .{ output.name, output.scale.value });
+                 output.configured = true;
+             },
++            .scale => |ev| {
++                if (ev.factor > 0) output.pending_scale = Scale.Factor.init(@intCast(ev.factor)) catch unreachable;
++            },
+             .name => |ev| {
+                 output.name = ctx.gpa.dupe(u8, mem.span(ev.name)) catch |err| switch (err) {
+                     error.OutOfMemory => {
+@@ -364,13 +377,16 @@ const Surface = struct {
+         }
+
+         // If we made it till here we can finally draw on your surface.
+-        // Get a new buffer not busy.
+-        const buffer = try ctx.backend.pool.next_buffer(surface.width, surface.height);
++        // Layer-shell sizes are logical; SHM buffers and rendering use physical pixels.
++        const scale = ctx.backend.req_output.scale;
++        const physical = try scale.physical_size(surface.width, surface.height);
++        const buffer = try ctx.backend.pool.next_buffer(physical.width, physical.height);
+         assert(!buffer.busy);
+
+-        try ctx.bar.render(buffer, @intCast(surface.width), @intCast(surface.height));
++        try ctx.bar.render(buffer, @intCast(physical.width), @intCast(physical.height));
+
+-        // Attach the buffer to the surface.
++        // Commit the matching scale and physical buffer atomically.
++        surface.wl_surface.setBufferScale(@intCast(scale.value));
+         surface.wl_surface.attach(buffer.wl_buffer, 0, 0);
+         surface.wl_surface.damageBuffer(0, 0, buffer.width, buffer.height);
+         buffer.busy = true;
+@@ -387,13 +403,16 @@ const Surface = struct {
+     }
+
+     fn schedule_frame_and_commit(surface: *Surface) void {
+-        if (surface.frame_pending) return;
++        if (!surface.frame_pending) {
++            // Request a new callback for the next frame.
++            surface.frame_callback = surface.wl_surface.frame() catch return;
++            surface.frame_callback.?.setListener(*Surface, frame_callback_listener, surface);
++            surface.frame_pending = true;
++        }
+
+-        // Request a new callback for the next frame.
+-        surface.frame_callback = surface.wl_surface.frame() catch return;
+-        surface.frame_callback.?.setListener(*Surface, frame_callback_listener, surface);
++        // A redraw may be triggered by a configure while a callback is pending.
++        // Always commit attached buffers and other pending surface state.
+         surface.wl_surface.commit();
+-        surface.frame_pending = true;
+     }
+
+     fn hotspot_from_point(surface: *Surface, x: u31, y: u31) ?*HotSpot {
+@@ -680,6 +699,9 @@ pub fn init(backend: *Backend) !bool {
+         backend.req_output = output;
+     }
+
++    backend.req_output.selected = true;
++    try ctx.bar.set_scale(backend.req_output.scale);
++
+     // We finally have all the infos needed to create the surface and start rendering.
+     try backend.surface.?.send_frame();
+
+diff --git a/src/Bar.zig b/src/Bar.zig
+index 9180842..7078868 100644
+--- a/src/Bar.zig
++++ b/src/Bar.zig
+@@ -23,6 +23,7 @@ const ctx = &@import("main.zig").context;
+ const Buffer = @import("Backend.zig").Buffer;
+ const data = @import("data.zig");
+ const decorations = @import("decorations.zig");
++const Scale = @import("Scale.zig");
+ const Text = @import("Text.zig");
+ const Bar = @This();
+
+@@ -58,6 +59,7 @@ pub const Config = struct {
+
+ config: Config = .{},
+ font: *fcft.Font = undefined,
++scale: Scale.Factor = .one,
+
+ /// True if user requested a width (i.e. config.width > 0). If false the width
+ /// received in the layer_surface configure event is used.
+@@ -69,7 +71,7 @@ input: std.ArrayListUnmanaged(u8) = .{},
+ pub fn new(config: Config) !Bar {
+     return Bar{
+         .config = config,
+-        .font = try Text.get_fcft_fonts(config.fonts_name),
++        .font = try Text.get_fcft_fonts(config.fonts_name, .one),
+         .req_width = if (config.width > 0) true else false,
+     };
+ }
+@@ -80,9 +82,35 @@ pub fn deinit(bar: *Bar) void {
+     bar.input.deinit(ctx.gpa);
+ }
+
++pub fn set_scale(bar: *Bar, scale: Scale.Factor) !void {
++    if (bar.scale.value == scale.value) return;
++
++    const font = try Text.get_fcft_fonts(bar.config.fonts_name, scale);
++    const old_font = bar.font;
++    bar.font = font;
++    bar.scale = scale;
++    old_font.destroy();
++}
++
++fn physical_config(config: Config, scale: Scale.Factor) !Config {
++    var physical = config;
++    physical.width = try scale.physical(u16, config.width);
++    physical.height = try scale.physical(u16, config.height);
++    physical.border.top = try scale.physical(u16, config.border.top);
++    physical.border.right = try scale.physical(u16, config.border.right);
++    physical.border.bottom = try scale.physical(u16, config.border.bottom);
++    physical.border.left = try scale.physical(u16, config.border.left);
++    physical.line_height = try scale.physical(u16, config.line_height);
++    return physical;
++}
++
+ /// Draw the bar on the Buffer.
+ /// surface_w is always the width of the output.
+ pub fn render(bar: *Bar, buffer: *Buffer, surface_w: u16, h: u16) !void {
++    const logical_config = bar.config;
++    bar.config = try physical_config(logical_config, bar.scale);
++    defer bar.config = logical_config;
++
+     // Width where we draw our bar.
+     const w = if (bar.req_width) bar.config.width else surface_w;
+
+diff --git a/src/Scale.zig b/src/Scale.zig
+new file mode 100644
+index 0000000..ae7e700
+--- /dev/null
++++ b/src/Scale.zig
+@@ -0,0 +1,51 @@
++const std = @import("std");
++
++pub const Size = struct {
++    width: u31,
++    height: u31,
++};
++
++pub const Factor = struct {
++    value: u31,
++
++    pub const one: Factor = .{ .value = 1 };
++
++    pub fn init(value: u31) !Factor {
++        if (value == 0) return error.InvalidScale;
++        return .{ .value = value };
++    }
++
++    pub fn physical(factor: Factor, comptime T: type, logical: T) !T {
++        const product = try std.math.mul(u31, @intCast(logical), factor.value);
++        return std.math.cast(T, product) orelse error.Overflow;
++    }
++
++    pub fn physical_size(factor: Factor, logical_width: u31, logical_height: u31) !Size {
++        return .{
++            .width = try factor.physical(u31, logical_width),
++            .height = try factor.physical(u31, logical_height),
++        };
++    }
++
++    pub fn font_attributes(factor: Factor, buffer: []u8) ![:0]u8 {
++        return std.fmt.bufPrintZ(buffer, "scale={d}", .{factor.value});
++    }
++};
++
++test "logical geometry maps to scaled physical buffers" {
++    const scale1 = try Factor.init(1);
++    const scale2 = try Factor.init(2);
++    try std.testing.expectEqual(Size{ .width = 400, .height = 20 }, try scale1.physical_size(400, 20));
++    try std.testing.expectEqual(Size{ .width = 800, .height = 40 }, try scale2.physical_size(400, 20));
++}
++
++test "fontconfig attributes use the output scale" {
++    var buffer: [32]u8 = undefined;
++    try std.testing.expectEqualStrings("scale=1", try Factor.one.font_attributes(&buffer));
++    try std.testing.expectEqualStrings("scale=2", try (try Factor.init(2)).font_attributes(&buffer));
++}
++
++test "zero and overflowing scales are rejected" {
++    try std.testing.expectError(error.InvalidScale, Factor.init(0));
++    try std.testing.expectError(error.Overflow, (try Factor.init(2)).physical(u16, std.math.maxInt(u16)));
++}
+diff --git a/src/Text.zig b/src/Text.zig
+index d1a4f64..1ebea80 100644
+--- a/src/Text.zig
++++ b/src/Text.zig
+@@ -23,6 +23,7 @@ const pixman = @import("pixman");
+
+ const ctx = &@import("main.zig").context;
+ const decorations = @import("decorations.zig");
++const Scale = @import("Scale.zig");
+ const Text = @This();
+
+ const log = std.log.scoped(.text);
+@@ -170,7 +171,7 @@ pub fn render_glyphs(
+     }
+ }
+
+-pub fn get_fcft_fonts(fonts: []const u8) !*fcft.Font {
++pub fn get_fcft_fonts(fonts: []const u8, scale: Scale.Factor) !*fcft.Font {
+     var arena = std.heap.ArenaAllocator.init(ctx.gpa);
+     defer arena.deinit();
+     const ally = arena.allocator();
+@@ -183,7 +184,9 @@ pub fn get_fcft_fonts(fonts: []const u8) !*fcft.Font {
+         try list.append(ally, try ally.dupeZ(u8, font));
+     }
+
+-    const fcft_fonts = try fcft.Font.fromName(list.items[0..], null);
++    var attributes_buffer: [32]u8 = undefined;
++    const attributes = try scale.font_attributes(&attributes_buffer);
++    const fcft_fonts = try fcft.Font.fromName(list.items[0..], attributes.ptr);
+     errdefer fcft_fonts.destroy();
+
+     return fcft_fonts;
+diff --git a/src/data.zig b/src/data.zig
+index 1e53822..4f498f8 100644
+--- a/src/data.zig
++++ b/src/data.zig
+@@ -140,7 +140,10 @@ fn parse_input(input: []const u8, height: u16) !Entries {
+                 try entry.lines.putNoClobber(ally, .under, line);
+             },
+
+-            .attr_offset => entry.offset = try fmt.parseUnsigned(u15, token.bytes[2..], 10),
++            .attr_offset => entry.offset = try ctx.bar.scale.physical(
++                u15,
++                try fmt.parseUnsigned(u15, token.bytes[2..], 10),
++            ),
+
+             .attr_action => entry.action = token.bytes[2..],
+
+@@ -316,7 +319,10 @@ const Entry = struct {
+         }
+
+         const height = blk: {
+-            if (parsed[2]) |h| break :blk try fmt.parseUnsigned(u16, h, 10);
++            if (parsed[2]) |h| break :blk try ctx.bar.scale.physical(
++                u16,
++                try fmt.parseUnsigned(u16, h, 10),
++            );
+             break :blk ctx.bar.config.line_height;
+         };
+         const line_h = blk: {
+@@ -325,7 +331,7 @@ const Entry = struct {
+                     "line height({d}) greater than possible height({d}), setting it to 2",
+                     .{ height, entry_height },
+                 );
+-                break :blk 2;
++                break :blk try ctx.bar.scale.physical(u16, 2);
+             }
+             break :blk height;
+         };
+diff --git a/src/test_main.zig b/src/test_main.zig
+index f36e93a..ca85a3c 100644
+--- a/src/test_main.zig
++++ b/src/test_main.zig
+@@ -1,3 +1,4 @@
+ test "all tests" {
++    _ = @import("Scale.zig");
+     _ = @import("Tokenizer.zig");
+ }

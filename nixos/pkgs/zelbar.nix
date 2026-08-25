@@ -15,6 +15,8 @@ let
   rev = "b1f1fe4a7f30332fbe6bffeaea77ef292c0f1932";
   sourceHash = "sha256-r5kJ7FOSAluytSsQztV8CRHQ63flpFeBOpVZY6CAVbM=";
   zigDepsHash = "sha256-OKrDhSBSa0Sro1zj8+YPMqrxtNfWIgvvCctcQDe3O98=";
+  hidpiPatch = ./zelbar-hidpi.patch;
+  hidpiPatchHash = "sha256-VpCCTjfMrpwobBqg6/9uHt5I5Zq3HETZc3Kz5+SMZT0=";
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "zelbar";
@@ -32,6 +34,8 @@ stdenv.mkDerivation (finalAttrs: {
     fetchAll = true;
     hash = zigDepsHash;
   };
+
+  patches = [ hidpiPatch ];
 
   strictDeps = true;
 
@@ -57,7 +61,13 @@ stdenv.mkDerivation (finalAttrs: {
   doCheck = true;
 
   passthru = {
-    inherit rev sourceHash zigDepsHash;
+    inherit
+      rev
+      sourceHash
+      zigDepsHash
+      hidpiPatch
+      hidpiPatchHash
+      ;
   };
 
   meta = {
