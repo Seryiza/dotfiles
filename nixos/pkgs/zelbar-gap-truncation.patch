@@ -1,0 +1,461 @@
+diff --git a/README.md b/README.md
+index 1a1c7bd..7b23371 100644
+--- a/README.md
++++ b/README.md
+@@ -56,12 +56,20 @@ after each text block.
+ %{R}                         Swap background and foreground colors
+ %{O:[0xRRGGBB[AA]:size]}     Overline color:size in pixel
+ %{U:[0xRRGGBB[AA]:size]}     Underline color:size in pixel
+-%{X:size}                    Offset in pixel in the alignment direction
++%{X:size}                    Offset in logical pixels in the alignment direction
++%{G:size}                    Minimum logical-pixel gap before the right group
+ %{A:action}                  Text to send to the STDOUT on mouse click
+ %{l|c|r}                     Alignment of the text (left|center|right) in
+                                the bar
+ ```
+
++`%{G:size}` applies to the right-aligned group containing the following text
++block. The largest gap declared by entries in that group is used. Without
++`%{G}`, the gap is zero. Zelbar computes the right group's start and clips the
++left group at whole-glyph boundaries. Truncated text ends with one `…`; fully
++visible text does not. The gap is not made from spaces or font metrics. Like
++`%{X:size}`, it is scaled for the output.
++
+ See **zelbar**(1) man page for more information.
+
+ ### Output
+diff --git a/doc/zelbar.1 b/doc/zelbar.1
+index f4b3be2..b1713ce 100644
+--- a/doc/zelbar.1
++++ b/doc/zelbar.1
+@@ -214,12 +214,21 @@ To change the size, you need to use:
+ .in
+ .TP
+ .B %{X:size}
+-Offset in pixel in the alignment direction of the following text block.
++Offset in logical pixels in the alignment direction of the following text block.
+ Do
+ .B nothing
+ for text block with alignment set to
+ .BR center .
+ .TP
++.B %{G:size}
++Minimum gap in logical pixels before the right-aligned group containing the
++following text block. The largest gap declared by entries in that group is
++used; the default is zero. Zelbar computes the start of the right group and
++clips the left group at whole-glyph boundaries. Truncated text ends with one
++Unicode ellipsis; fully visible text does not. The gap is not made from spaces
++and does not depend on font metrics. It is scaled like
++.BR %{X:size} .
++.TP
+ .B %{A:action}
+ Action on mouse click. The command is send to STDOUT followed by a newline.
+ Allowing to pipe it to a script, execute it or ignore it.
+diff --git a/src/Text.zig b/src/Text.zig
+index 1ebea80..8d3307f 100644
+--- a/src/Text.zig
++++ b/src/Text.zig
+@@ -37,6 +37,7 @@ const Mode = union(enum) {
+ };
+
+ mode: Mode,
++font: *fcft.Font,
+ /// The width the text takes.
+ width: i32 = 0,
+
+@@ -65,6 +66,7 @@ pub fn new(ally: mem.Allocator, bytes: []const u8, font: *fcft.Font) !Text {
+
+         return Text{
+             .mode = .{ .run = run },
++            .font = font,
+             .width = text_w,
+         };
+     } else {
+@@ -94,6 +96,7 @@ pub fn new(ally: mem.Allocator, bytes: []const u8, font: *fcft.Font) !Text {
+                 .glyphs = glyphs,
+                 .kerns = kerns,
+             } },
++            .font = font,
+             .width = text_w,
+         };
+     }
+@@ -109,11 +112,71 @@ pub fn deinit(text: *Text, ally: mem.Allocator) void {
+     }
+ }
+
++pub const VisiblePrefix = struct {
++    width: i32,
++    pen: i32,
++    glyph_count: usize,
++    ellipsis: ?*const fcft.Glyph = null,
++};
++
++fn fit_prefix(text: Text, max_width: i32) VisiblePrefix {
++    const glyphs = switch (text.mode) {
++        .run => text.mode.run.glyphs[0..text.mode.run.count],
++        .glyphs => text.mode.glyphs.glyphs,
++    };
++    var pen: i32 = 0;
++    var width: i32 = 0;
++    var count: usize = 0;
++
++    for (glyphs, 0..) |glyph, i| {
++        const glyph_x = pen + if (text.mode == .glyphs) @as(i32, @intCast(text.mode.glyphs.kerns[i])) else 0;
++        const next_pen = glyph_x + glyph.advance.x;
++        const ink_right = glyph_x + @as(i32, @intCast(glyph.x)) + @as(i32, @intCast(glyph.width));
++        const glyph_right = @max(next_pen, ink_right);
++        if (glyph_right > max_width) break;
++        pen = next_pen;
++        width = @max(width, glyph_right);
++        count += 1;
++    }
++
++    return .{ .width = @max(width, 0), .pen = pen, .glyph_count = count };
++}
++
++pub fn full_prefix(text: Text) VisiblePrefix {
++    const glyph_count = switch (text.mode) {
++        .run => text.mode.run.count,
++        .glyphs => text.mode.glyphs.glyphs.len,
++    };
++    return .{ .width = text.width, .pen = text.width, .glyph_count = glyph_count };
++}
++
++pub fn visible_prefix(text: Text, max_width: i32) !VisiblePrefix {
++    const visible = text.fit_prefix(max_width);
++    const glyph_count = switch (text.mode) {
++        .run => text.mode.run.count,
++        .glyphs => text.mode.glyphs.glyphs.len,
++    };
++    if (visible.glyph_count == glyph_count) return visible;
++
++    const ellipsis = try text.font.rasterizeCharUtf32(0x2026, .none);
++    const ellipsis_width = @max(
++        ellipsis.advance.x,
++        @as(i32, @intCast(ellipsis.x)) + @as(i32, @intCast(ellipsis.width)),
++    );
++    if (ellipsis_width > max_width) return .{ .width = 0, .pen = 0, .glyph_count = 0 };
++
++    var truncated = text.fit_prefix(max_width - ellipsis_width);
++    truncated.width = @max(truncated.width, truncated.pen + ellipsis_width);
++    truncated.ellipsis = ellipsis;
++    return truncated;
++}
++
+ pub fn render_glyphs(
+     text: Text,
+     image: *pixman.Image,
+     fg_color: []const u8,
+     x: i32,
++    visible: VisiblePrefix,
+     y: i32,
+ ) !void {
+     const fg = try decorations.parse_rgba(fg_color);
+@@ -122,30 +185,33 @@ pub fn render_glyphs(
+         .glyphs => text.mode.glyphs.glyphs,
+     };
+     var tmp_x = x;
++    const glyph_count = @min(glyphs.len, visible.glyph_count);
++    const render_count = glyph_count + @intFromBool(visible.ellipsis != null);
+
+     var i: usize = 0;
+-    while (i < glyphs.len) : (i += 1) {
+-        if (text.mode == .glyphs) tmp_x += @intCast(text.mode.glyphs.kerns[i]);
++    while (i < render_count) : (i += 1) {
++        const glyph = if (i < glyph_count) glyphs[i] else visible.ellipsis.?;
++        if (i < glyph_count and text.mode == .glyphs) tmp_x += @intCast(text.mode.glyphs.kerns[i]);
+
+         const c = pixman.Image.createSolidFill(&fg).?;
+         defer _ = c.unref();
+
+-        switch (pixman.Image.getFormat(glyphs[i].pix)) {
++        switch (pixman.Image.getFormat(glyph.pix)) {
+             // Glyph is a pre-rendered image. (e.g. a color emoji)
+             .a8r8g8b8 => {
+                 pixman.Image.composite32(
+                     .over,
+-                    glyphs[i].pix,
++                    glyph.pix,
+                     null,
+                     image,
+                     0,
+                     0,
+                     0,
+                     0,
+-                    tmp_x + @as(i32, @intCast(glyphs[i].x)),
+-                    y - @as(i32, @intCast(glyphs[i].y)),
+-                    glyphs[i].width,
+-                    glyphs[i].height,
++                    tmp_x + @as(i32, @intCast(glyph.x)),
++                    y - @as(i32, @intCast(glyph.y)),
++                    glyph.width,
++                    glyph.height,
+                 );
+             },
+             // Glyph is an alpha mask.
+@@ -153,21 +219,21 @@ pub fn render_glyphs(
+                 pixman.Image.composite32(
+                     .over,
+                     c,
+-                    glyphs[i].pix,
++                    glyph.pix,
+                     image,
+                     0,
+                     0,
+                     0,
+                     0,
+-                    tmp_x + @as(i32, @intCast(glyphs[i].x)),
+-                    y - @as(i32, @intCast(glyphs[i].y)),
+-                    glyphs[i].width,
+-                    glyphs[i].height,
++                    tmp_x + @as(i32, @intCast(glyph.x)),
++                    y - @as(i32, @intCast(glyph.y)),
++                    glyph.width,
++                    glyph.height,
+                 );
+             },
+         }
+
+-        tmp_x += glyphs[i].advance.x;
++        tmp_x += glyph.advance.x;
+     }
+ }
+
+diff --git a/src/Tokenizer.zig b/src/Tokenizer.zig
+index 143b1eb..e4082a3 100644
+--- a/src/Tokenizer.zig
++++ b/src/Tokenizer.zig
+@@ -65,6 +65,10 @@ pub const Tag = enum {
+     /// %{X:size}
+     attr_offset,
+
++    /// Minimum gap before the right-aligned group
++    /// %{G:size}
++    attr_gap,
++
+     /// Action on mouse click
+     /// %{A:action}
+     attr_action,
+@@ -94,6 +98,7 @@ const State = enum {
+     attr_align_c,
+     attr_align_r,
+     attr_offset,
++    attr_gap,
+     attr_action,
+ };
+
+@@ -167,6 +172,10 @@ pub fn next(self: *Tokenizer) Token {
+                     tok_start = self.index;
+                     self.state = .attr_offset;
+                 },
++                'G' => {
++                    tok_start = self.index;
++                    self.state = .attr_gap;
++                },
+                 'A' => {
+                     tok_start = self.index;
+                     self.state = .attr_action;
+@@ -242,6 +251,14 @@ pub fn next(self: *Tokenizer) Token {
+                 }),
+                 else => return self.emit_error(.attribute_not_closed),
+             },
++            .attr_gap => switch (c) {
++                '0'...'9', ':' => {},
++                '}' => return self.emit(.start, .{
++                    .tag = .attr_gap,
++                    .bytes = self.buffer[tok_start..self.index],
++                }),
++                else => return self.emit_error(.attribute_not_closed),
++            },
+             .attr_action => switch (c) {
+                 '}' => return self.emit(.start, .{
+                     .tag = .attr_action,
+@@ -368,19 +385,31 @@ test "attributes block tokenizer (good input)" {
+     }
+
+     {
+-        const buf: []const u8 = "%{X:10}";
++        const buf: []const u8 = "%{X:10}%{G:50}";
+         var tokenizer = Tokenizer.init(buf);
+
+         var tok = tokenizer.next();
+         try testing.expect(tok.tag == .attr_offset);
+         try testing.expectEqualStrings(tok.bytes, "X:10");
+
++        tok = tokenizer.next();
++        try testing.expect(tok.tag == .attr_gap);
++        try testing.expectEqualStrings(tok.bytes, "G:50");
++
+         tok = tokenizer.next();
+         try testing.expect(tok.tag == .eol);
+         try testing.expectEqualStrings(tok.bytes, "");
+     }
+ }
+
++test "gap attribute rejects malformed input like offset" {
++    const testing = @import("std").testing;
++
++    var tokenizer = Tokenizer.init("%{G:no}");
++    try testing.expect(tokenizer.next().tag == .invalid);
++    try testing.expect(tokenizer.err == .attribute_not_closed);
++}
++
+ test "tokenizer (good input)" {
+     const testing = @import("std").testing;
+
+diff --git a/src/data.zig b/src/data.zig
+index 4f498f8..de31c87 100644
+--- a/src/data.zig
++++ b/src/data.zig
+@@ -46,13 +46,17 @@ pub fn expose(input: []const u8, pix: *pixman.Image, bar_x: u16, bar_w: u16) !vo
+     const R = 2;
+
+     const entries_w = entries.get_total_width();
++    const entries_gap = entries.get_max_gap();
+
+     // We start each alignment from their rightmost point. Use 3 variables to
+     // works with every possible order in the raw input.
++    const right_x = bar_x + bar_w - ctx.bar.config.border.right;
++    const right_start = @as(i32, right_x) - entries_w[R];
++    const left_max_x = right_start - if (entries_w[R] > 0) entries_gap[R] else 0;
+     var entries_x: [3]u16 = .{
+         bar_x + ctx.bar.config.border.left + entries_w[L],
+         bar_x + bar_w / 2 + entries_w[C] / 2,
+-        bar_x + bar_w - ctx.bar.config.border.right,
++        right_x,
+     };
+
+     var index: usize = entries.list.len;
+@@ -61,9 +65,9 @@ pub fn expose(input: []const u8, pix: *pixman.Image, bar_x: u16, bar_w: u16) !vo
+
+         var e = entries.list.get(index);
+         switch (e.alignment) {
+-            .left => entries_x[L] -= try e.render(pix, entries_x[L], entry_h),
+-            .center => entries_x[C] -= try e.render(pix, entries_x[C], entry_h),
+-            .right => entries_x[R] -= try e.render(pix, entries_x[R], entry_h),
++            .left => entries_x[L] -= try e.render(pix, entries_x[L], entry_h, left_max_x),
++            .center => entries_x[C] -= try e.render(pix, entries_x[C], entry_h, null),
++            .right => entries_x[R] -= try e.render(pix, entries_x[R], entry_h, null),
+         }
+     }
+
+@@ -144,6 +148,10 @@ fn parse_input(input: []const u8, height: u16) !Entries {
+                 u15,
+                 try fmt.parseUnsigned(u15, token.bytes[2..], 10),
+             ),
++            .attr_gap => entry.gap = try ctx.bar.scale.physical(
++                u15,
++                try fmt.parseUnsigned(u15, token.bytes[2..], 10),
++            ),
+
+             .attr_action => entry.action = token.bytes[2..],
+
+@@ -193,6 +201,21 @@ pub const Entries = struct {
+
+         return ret;
+     }
++
++    fn get_max_gap(entries: Entries) [3]u15 {
++        var ret: [3]u15 = .{ 0, 0, 0 };
++
++        for (entries.list.items(.alignment), entries.list.items(.gap)) |algn, gap| {
++            const index: usize = switch (algn) {
++                .left => 0,
++                .center => 1,
++                .right => 2,
++            };
++            ret[index] = @max(ret[index], gap);
++        }
++
++        return ret;
++    }
+ };
+
+ const Entry = struct {
+@@ -209,6 +232,8 @@ const Entry = struct {
+
+     /// Offset in alignment direction.
+     offset: u15,
++    /// Minimum gap before the right-aligned group.
++    gap: u15,
+     width: u16,
+
+     action: ?[]const u8,
+@@ -223,6 +248,7 @@ const Entry = struct {
+             .colors = .{},
+             .lines = .{},
+             .offset = 0,
++            .gap = 0,
+             .action = null,
+         };
+     }
+@@ -232,7 +258,7 @@ const Entry = struct {
+     ///   height: Usable entry height based on bar height.
+     ///
+     /// Return the total width of the entry to use as 'x' for the next one.
+-    pub fn render(entry: Entry, pix: *pixman.Image, prev_x: u16, height: u16) !u16 {
++    pub fn render(entry: Entry, pix: *pixman.Image, prev_x: u16, height: u16, max_x: ?i32) !u16 {
+         var x: i16 = @intCast(prev_x);
+         switch (entry.alignment) {
+             .left, .center => x = x + entry.offset - @as(i16, @intCast(entry.width)) - entry.offset,
+@@ -241,17 +267,25 @@ const Entry = struct {
+
+         const y: i16 = @intCast(if (ctx.bar.config.location == .bottom) ctx.bar.config.border.bottom else ctx.bar.config.border.top);
+
++        const visible = if (max_x) |limit|
++            try entry.text.visible_prefix(limit - @as(i32, x))
++        else
++            entry.text.full_prefix();
++        const visible_width: u16 = @intCast(visible.width);
++
+         const bg = entry.colors.get(.bg) orelse ctx.bar.config.colors.get(.bg).?;
+-        try decorations.draw_rectangle(pix, x, y, entry.width, height, bg);
++        try decorations.draw_rectangle(pix, x, y, visible_width, height, bg);
+
+         if (entry.action) |action| {
+-            try ctx.backend.surface.?.hotspots.append(ctx.gpa, .{
+-                .action = action,
+-                .x = @intCast(x),
+-                .y = @intCast(y),
+-                .width = entry.width,
+-                .height = height,
+-            });
++            if (visible_width > 0) {
++                try ctx.backend.surface.?.hotspots.append(ctx.gpa, .{
++                    .action = action,
++                    .x = @intCast(x),
++                    .y = @intCast(y),
++                    .width = visible_width,
++                    .height = height,
++                });
++            }
+         }
+
+         if (entry.lines.get(.over)) |line_o| {
+@@ -259,7 +293,7 @@ const Entry = struct {
+                 pix,
+                 x,
+                 y,
+-                entry.width,
++                visible_width,
+                 line_o.height,
+                 line_o.color,
+             );
+@@ -270,7 +304,7 @@ const Entry = struct {
+                 pix,
+                 x,
+                 y + @as(i16, @intCast(height - line_u.height)),
+-                entry.width,
++                visible_width,
+                 line_u.height,
+                 line_u.color,
+             );
+@@ -297,7 +331,7 @@ const Entry = struct {
+             if (ctx.bar.font.descent > 0) ctx.bar.font.descent else 0;
+
+         const fg = entry.colors.get(.fg) orelse ctx.bar.config.colors.get(.fg).?;
+-        try entry.text.render_glyphs(pix, fg, x, baseline);
++        try entry.text.render_glyphs(pix, fg, x, visible, baseline);
+
+         return entry.width + entry.offset;
+     }

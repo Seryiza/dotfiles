@@ -10,9 +10,12 @@ let
     hash = "sha256-r5kJ7FOSAluytSsQztV8CRHQ63flpFeBOpVZY6CAVbM=";
   };
   expectedPatchedSource = pkgs.applyPatches {
-    name = "zelbar-expected-hidpi-source";
+    name = "zelbar-expected-patched-source";
     src = expectedUpstreamSource;
-    patches = [ zelbar.hidpiPatch ];
+    patches = [
+      zelbar.hidpiPatch
+      zelbar.gapTruncationPatch
+    ];
   };
   sourceAfterPatchPhase = zelbar.overrideAttrs {
     pname = "zelbar-source-after-patch-phase";
@@ -42,7 +45,14 @@ assert zelbar.hidpiPatchHash == "sha256-VpCCTjfMrpwobBqg6/9uHt5I5Zq3HETZc3Kz5+SM
 assert
   builtins.hashFile "sha256" zelbar.hidpiPatch
   == "5690824e37ccae9c286c1aa0ebff6e1ede48e59ab71c44d97372b3e7e48c653d";
-assert (zelbar.patches or [ ]) == [ zelbar.hidpiPatch ];
+assert zelbar.gapTruncationPatchHash == "sha256-0Ypo7go8+er+cppIloWd9AIFKigN7Y0CmRh6FQSR8Yg=";
+assert
+  builtins.hashFile "sha256" zelbar.gapTruncationPatch
+  == "d18a68ee0a3cf9eafe729a4896859df402052a280ded8d0299187a150491f188";
+assert (zelbar.patches or [ ]) == [
+  zelbar.hidpiPatch
+  zelbar.gapTruncationPatch
+];
 assert !(zelbar ? postUnpack);
 assert !(zelbar ? unpackPhase);
 assert !(zelbar ? prePatch);

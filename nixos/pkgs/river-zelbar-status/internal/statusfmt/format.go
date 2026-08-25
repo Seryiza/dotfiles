@@ -123,10 +123,14 @@ func appendNonempty(parts []string, value string) []string {
 
 func buildFrame(left, right []string) string {
 	leftText := join(left, " · ")
+	rightText := join(right, " | ")
 	if leftText != "" {
 		leftText = "%{X:4}" + leftText
+		if rightText != "" {
+			rightText = "%{G:50}" + rightText
+		}
 	}
-	return "%{l}" + leftText + "%{r}" + join(right, " | ") + " \n"
+	return "%{l}" + leftText + "%{r}" + rightText + " \n"
 }
 
 func join(parts []string, separator string) string {

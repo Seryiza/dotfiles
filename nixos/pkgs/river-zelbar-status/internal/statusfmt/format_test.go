@@ -19,12 +19,22 @@ func TestFormatPlacesOnlyTitleLeftAndWorkspacePanelRight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "%{l}%{X:4}Current title%{r}W 2/4 | P 1/3 | Focus | 52％ audio +MIC | wg-work | ru | 87％ battery | 23 Aug 21:35 \n"
+	want := "%{l}%{X:4}Current title%{r}%{G:50}W 2/4 | P 1/3 | Focus | 52％ audio +MIC | wg-work | ru | 87％ battery | 23 Aug 21:35 \n"
 	if string(got) != want {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 	if strings.Contains(string(got), "||") || strings.Contains(string(got), "split") || strings.Contains(string(got), "3w") {
 		t.Fatalf("unexpected or duplicate status module: %q", got)
+	}
+}
+
+func TestFormatOmitsGapWithoutRightStatus(t *testing.T) {
+	got, err := Format(model.Snapshot{Machi: model.MachiState{Valid: true, Title: "Title only"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "%{l}%{X:4}Title only%{r} \n" {
+		t.Fatalf("unexpected title-only frame %q", got)
 	}
 }
 

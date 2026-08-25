@@ -17,6 +17,8 @@ let
   zigDepsHash = "sha256-OKrDhSBSa0Sro1zj8+YPMqrxtNfWIgvvCctcQDe3O98=";
   hidpiPatch = ./zelbar-hidpi.patch;
   hidpiPatchHash = "sha256-VpCCTjfMrpwobBqg6/9uHt5I5Zq3HETZc3Kz5+SMZT0=";
+  gapTruncationPatch = ./zelbar-gap-truncation.patch;
+  gapTruncationPatchHash = "sha256-0Ypo7go8+er+cppIloWd9AIFKigN7Y0CmRh6FQSR8Yg=";
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "zelbar";
@@ -35,7 +37,10 @@ stdenv.mkDerivation (finalAttrs: {
     hash = zigDepsHash;
   };
 
-  patches = [ hidpiPatch ];
+  patches = [
+    hidpiPatch
+    gapTruncationPatch
+  ];
 
   strictDeps = true;
 
@@ -67,6 +72,8 @@ stdenv.mkDerivation (finalAttrs: {
       zigDepsHash
       hidpiPatch
       hidpiPatchHash
+      gapTruncationPatch
+      gapTruncationPatchHash
       ;
   };
 

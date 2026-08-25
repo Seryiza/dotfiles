@@ -113,6 +113,48 @@ run_initial() {
   cleanup_session
 }
 
+run_long_title() {
+  local screenshot title
+  printf -v title 'Neutral long Unicode title · Кириллица · %.0s' {1..12}
+  start_session
+  screenshot="$session_root/long-title.png"
+  "$WLR_RANDR" --output "$OUTPUT" --custom-mode 2560x1600 --scale 2
+  sleep 0.1
+
+  {
+    printf '%%{l}%%{X:4}%s%%{r}%%{G:50}W 1/4 | P 1/3 | ru | 87％ battery | 23 Aug 21:35 \n' "$title"
+    sleep 2
+  } | "$ZELBAR" -o "$OUTPUT" -L 1 -g 0:20 \
+    -fn "Iosevka,Noto Color Emoji" -B 0xFFFFFFFF -F 0x000000FF \
+    >/dev/null 2>"$session_root/long-title.log" &
+  client_pid=$!
+  sleep 0.4
+  if ! kill -0 "$client_pid" 2>/dev/null; then
+    cat "$session_root/long-title.log" >&2
+    echo "Zelbar exited while rendering a long title" >&2
+    return 1
+  fi
+
+  "$GRIM" -g '0,0 1280x20' "$screenshot"
+  "$PYTHON" - "$screenshot" <<'PY'
+from PIL import Image
+import sys
+
+image = Image.open(sys.argv[1]).convert("RGB")
+ink = [
+    x
+    for x in range(image.width)
+    if any(min(image.getpixel((x, y))) < 245 for y in range(image.height))
+]
+gaps = [(right - left - 1, left, right) for left, right in zip(ink, ink[1:])]
+gap, left, right = max(gaps, default=(0, 0, 0))
+if gap < 100 or left == 0 or right >= image.width - 1:
+    raise SystemExit(f"long title/right status gap={gap}px left={left} right={right} width={image.width}")
+print(f"PASS long title: Zelbar visible with {gap}px physical gap")
+PY
+  cleanup_session
+}
+
 run_transition() {
   local trace
   start_session
@@ -168,4 +210,5 @@ PY
 
 run_initial 1
 run_initial 2
+run_long_title
 run_transition
