@@ -12,9 +12,21 @@ import (
 
 	"seryiza.local/river-zelbar-status/internal/engine"
 	"seryiza.local/river-zelbar-status/internal/machi"
+	"seryiza.local/river-zelbar-status/internal/model"
 	"seryiza.local/river-zelbar-status/internal/renderer"
 	"seryiza.local/river-zelbar-status/internal/riverxkb"
 	"seryiza.local/river-zelbar-status/internal/statusfmt"
+	"seryiza.local/river-zelbar-status/internal/statussource"
+)
+
+var (
+	zelbarDefault       string
+	machictlDefault     string
+	orgTimeblockDefault string
+	orgClockDefault     string
+	wireGuardDefault    string
+	wpctlDefault        string
+	nmcliDefault        string
 )
 
 func main() {
@@ -29,19 +41,27 @@ func run() error {
 
 	flags := flag.NewFlagSet("river-zelbar-status", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
-	zelbarPath := flags.String("zelbar", "", "absolute path to the Zelbar executable")
-	machictlPath := flags.String("machictl", "", "absolute path to the machictl executable")
+	zelbarPath := flags.String("zelbar", zelbarDefault, "absolute path to the Zelbar executable")
+	machictlPath := flags.String("machictl", machictlDefault, "absolute path to the machictl executable")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("unexpected arguments: %v", flags.Args())
 	}
-	if *zelbarPath == "" || !filepath.IsAbs(*zelbarPath) {
-		return fmt.Errorf("configuration: --zelbar must be an absolute executable path")
+	paths := map[string]string{
+		"--zelbar":               *zelbarPath,
+		"--machictl":             *machictlPath,
+		"packaged org-timeblock": orgTimeblockDefault,
+		"packaged org-clock":     orgClockDefault,
+		"packaged wireguard":     wireGuardDefault,
+		"packaged wpctl":         wpctlDefault,
+		"packaged nmcli":         nmcliDefault,
 	}
-	if *machictlPath == "" || !filepath.IsAbs(*machictlPath) {
-		return fmt.Errorf("configuration: --machictl must be an absolute executable path")
+	for name, path := range paths {
+		if path == "" || !filepath.IsAbs(path) {
+			return fmt.Errorf("configuration: %s must be an absolute executable path", name)
+		}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,9 +79,17 @@ func run() error {
 		},
 	}, 3*time.Second)
 
+	runner := statussource.ExecRunner{}
 	sources := []engine.Source{
 		machi.New(machi.Command{Path: *machictlPath}, output),
 		riverxkb.NewSource(),
+		statussource.NewOrg(statussource.Command{Path: orgTimeblockDefault}, model.FieldOrgTimeblock, runner),
+		statussource.NewOrg(statussource.Command{Path: orgClockDefault}, model.FieldOrgClock, runner),
+		statussource.NewAudio(statussource.Command{Path: wpctlDefault}, runner),
+		statussource.NewNetwork(statussource.Command{Path: nmcliDefault}, runner),
+		statussource.NewWireGuard(statussource.Command{Path: wireGuardDefault}, runner),
+		statussource.NewBattery("/sys/class/power_supply"),
+		statussource.NewClock(nil),
 	}
 	return engine.Run(ctx, sources, zelbar, statusfmt.Format)
 }

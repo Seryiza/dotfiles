@@ -28,6 +28,27 @@ func TestFormatReducesSnapshotWithOmissionAndSeparators(t *testing.T) {
 	}
 }
 
+func TestFormatPreservesCompleteTextSourceOrder(t *testing.T) {
+	snapshot := model.Snapshot{
+		OrgTimeblock: "timeblock",
+		OrgClock:     "org-clock",
+		Audio:        "audio",
+		Network:      "network",
+		WireGuard:    "wireguard",
+		XKB:          "xkb",
+		Battery:      "battery",
+		Clock:        "clock",
+	}
+	got, err := Format(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "%{l}%{r}timeblock | org-clock | audio | network | wireguard | xkb | battery | clock \n"
+	if string(got) != want {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
 func TestFormatEmptySnapshotStillEndsInTextBlock(t *testing.T) {
 	got, err := Format(model.Snapshot{})
 	if err != nil {
