@@ -9,7 +9,7 @@ buildGoModule {
   version = "0.1.0";
 
   src = lib.cleanSource ./.;
-  vendorHash = "sha256-eVTmOA2A3wA6CmdOkuiM0pQlA059J6ekpOUC3ZwtZ1A=";
+  vendorHash = "sha256-YKqCeXbHaaxoHmUC1/4Z0GIym3qxcqzh5SVaA+7ZI/o=";
 
   subPackages = [ "cmd/river-zelbar-status" ];
   doCheck = true;
