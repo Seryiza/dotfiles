@@ -122,9 +122,14 @@ pkgs.runCommand "river-session-policy-check"
     grep -F 'KEY_F23' "$xremap_config"
     grep -F 'C-KEY_LEFTBRACE' "$xremap_config"
 
-    river_waybar="$home_files/.config/systemd/user/wayland-session@river.target.wants/waybar@river.service"
-    test -L "$river_waybar"
-    grep -F 'BindsTo=wayland-session@%i.target' "$river_waybar"
+    river_wants="$home_files/.config/systemd/user/wayland-session@river.target.wants"
+    river_zelbar="$river_wants/zelbar-river.service"
+    river_waybar="$river_wants/waybar@river.service"
+    test -L "$river_zelbar"
+    test ! -e "$river_waybar"
+    test "$(find "$river_wants" -maxdepth 1 -type l \
+      \( -name 'waybar*.service' -o -name 'zelbar*.service' \) | wc -l)" -eq 1
+    grep -F 'BindsTo=wayland-session@river.target' "$river_zelbar"
 
     touch "$out"
   ''

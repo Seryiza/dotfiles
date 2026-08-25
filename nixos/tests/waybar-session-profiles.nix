@@ -71,11 +71,12 @@ pkgs.runCommand "waybar-session-profiles-check"
     assert {"mango/taskbar", "sway/language", "mango/layout"} <= mango[0].keys()
     PY
 
-    for instance in mango river sway; do
+    for instance in mango sway; do
       link="$unit_dir/wayland-session@$instance.target.wants/waybar@$instance.service"
       test -L "$link"
       test "$(readlink -f "$link")" = "$(readlink -f "$unit_dir/waybar@.service")"
     done
+    test ! -e "$unit_dir/wayland-session@river.target.wants/waybar@river.service"
 
     grep -F 'After=wayland-session@%i.target graphical-session.target' "$unit_dir/waybar@.service"
     grep -F 'BindsTo=wayland-session@%i.target' "$unit_dir/waybar@.service"
@@ -87,12 +88,12 @@ pkgs.runCommand "waybar-session-profiles-check"
     test -x "$launcher"
     grep -F 'case "$1" in' "$launcher"
     grep -F 'mango) profile=mango ;;' "$launcher"
-    grep -F 'river) profile=generic ;;' "$launcher"
     grep -F 'sway) profile=generic ;;' "$launcher"
+    ! grep -F 'river) profile=' "$launcher"
     ! grep -E 'WAYBAR_(PROFILE|COMPOSITOR)|SWAYSOCK|WAYLAND_DISPLAY|socket' "$launcher"
 
     mkdir -p "$TMPDIR/runtime" "$TMPDIR/verify-units"
-    for instance in mango river sway; do
+    for instance in mango sway; do
       waybar_instance="$unit_dir/wayland-session@$instance.target.wants/waybar@$instance.service"
       session_target="$TMPDIR/verify-units/wayland-session@$instance.target"
       ln -s "${toplevel}/etc/systemd/user/wayland-session@.target" "$session_target"

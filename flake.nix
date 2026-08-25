@@ -95,6 +95,17 @@
             inherit (packages) zelbar;
           };
 
+          zelbar-runtime = packages.callPackage ./nixos/tests/zelbar-runtime.nix {
+            inherit (packages) zelbar river-zelbar-status;
+          };
+
+          zelbar-session = packages.callPackage ./nixos/tests/zelbar-session.nix (
+            yuriArtifacts
+            // {
+              inherit (packages) zelbar river-zelbar-status machi;
+            }
+          );
+
           river-zelbar-status = packages.river-zelbar-status;
 
           river-xkb-shortcuts =
