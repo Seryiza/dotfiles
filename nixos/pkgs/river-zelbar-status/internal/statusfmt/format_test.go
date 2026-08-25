@@ -9,7 +9,7 @@ import (
 	"seryiza.local/river-zelbar-status/internal/model"
 )
 
-func TestFormatReducesSnapshotWithOmissionAndSeparators(t *testing.T) {
+func TestFormatPlacesOnlyTitleLeftAndWorkspacePanelRight(t *testing.T) {
 	snapshot := model.Snapshot{
 		Machi:        model.MachiState{Valid: true, WorkspaceIndex: 1, WorkspaceCount: 4, PanelIndex: 0, PanelCount: 3, Mode: "split", WindowCount: 3, Title: "Current title"},
 		OrgTimeblock: "Focus", Audio: "52% audio +MIC", WireGuard: "wg-work", XKB: "ru", Battery: "87% battery", Clock: "23 Aug 21:35",
@@ -19,12 +19,12 @@ func TestFormatReducesSnapshotWithOmissionAndSeparators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "%{l}W 2/4 · P 1/3 · split · 3w · Current title%{r}Focus | 52％ audio +MIC | wg-work | ru | 87％ battery | 23 Aug 21:35 \n"
+	want := "%{l}%{X:4}Current title%{r}W 2/4 | P 1/3 | Focus | 52％ audio +MIC | wg-work | ru | 87％ battery | 23 Aug 21:35 \n"
 	if string(got) != want {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
-	if strings.Contains(string(got), "||") || strings.Contains(string(got), "·  ·") {
-		t.Fatalf("empty field left duplicate separators: %q", got)
+	if strings.Contains(string(got), "||") || strings.Contains(string(got), "split") || strings.Contains(string(got), "3w") {
+		t.Fatalf("unexpected or duplicate status module: %q", got)
 	}
 }
 

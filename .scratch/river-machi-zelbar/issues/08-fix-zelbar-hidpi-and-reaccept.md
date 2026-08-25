@@ -38,7 +38,7 @@ Apply one minimal local HiDPI patch to the pinned Zelbar v1.2.0 source, prove th
 
 - Activate through a rollback-protected generation on `yuri-alpha`.
 - Compare scale 1 and scale 2: text is sharp at both scales, the bar remains at the top with 20 logical pixels, and text/decorations are neither clipped nor displaced.
-- Confirm the normal `-g 0:20` launcher and status framing remain unchanged.
+- Confirm the normal `-g 0:20` launcher remains unchanged and the current title-left, `W`/`P`-right framing matches the specification.
 - Restart the service and exercise scale changes, suspend/resume, River logout/login and a fresh session; no blurry stale buffer, clipping, orphan or restart loop remains.
 - Capture `wlr-randr`, the running Zelbar argv and a screenshot for the repeated acceptance record.
 - After automated work, set this ticket to `ready-for-human`; do not mark the feature accepted until this visual gate passes.

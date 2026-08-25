@@ -113,7 +113,7 @@ machictl -watch eDP-1
 Verify all of the following:
 
 1. Press `Ctrl+Space` repeatedly. The layout text alternates promptly between `us` and `ru`. If two keyboards are available, differing groups show `mixed`; removing one restores the remaining layout.
-2. Create/switch Machi workspaces and panels, toggle single/split mode, focus windows and change a title. `W`, `P`, mode, count and title update from each complete snapshot; displayed indices are one-based.
+2. Create/switch Machi workspaces and panels, then focus windows and change a title. The left side shows only the current title, offset 4 logical pixels from the screen edge. The right side shows one-based `W` and `P` modules separated from each other and subsequent modules by ` | `; mode and window count are not displayed.
 3. Check Org, WireGuard, audio, network, battery and minute-clock fields against their sources.
 4. Use long ASCII, Cyrillic, emoji and combining-mark titles, including literal `%{}`. Text must neither inject markup nor clip vertically; optional empty fields must not leave duplicate separators.
 

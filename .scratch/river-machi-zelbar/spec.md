@@ -66,18 +66,19 @@ Public plugin DSL, arbitrary command config и generic renderer selection не �
 
 ## Rendered Layout
 
-Формат первой версии:
+Актуальный формат:
 
 ```text
-left:  W 2/4 · P 1/3 · split · 3w · Current window title
-right: Org timeblock | Org clock | 52% audio +MIC | wlan | wg-work | ru | 87% battery | 23 Aug 21:35
+left:  <4 logical px> Current window title
+right: W 2/4 | P 1/3 | Org timeblock | Org clock | 52% audio +MIC | wlan | wg-work | ru | 87% battery | 23 Aug 21:35
 ```
 
 Правила:
 
 - Machi indices преобразуются из zero-based в human-facing `+1` только renderer view.
-- `mode`, window count и title берутся из одного complete Machi snapshot.
-- Empty title просто опускается.
+- Title отображается единственным левым полем с Zelbar offset `%{X:4}`; empty title вместе с offset опускается.
+- Workspace и panel отображаются первыми правыми модулями и отделяются друг от друга и остальных модулей через ` | `.
+- Machi mode и window count не отображаются.
 - Empty optional fields и соседние separators опускаются.
 - Healthy Ethernet/Wi-Fi скрываются, как в текущем visible Waybar policy.
 - Wi-Fi `<20%` отображается как `wlan`; disconnected/disabled показываются текстом.
@@ -256,7 +257,7 @@ The status Module must never call `uwsm finalize`, start Machi, or own River inp
 ## User Stories
 
 1. As a River user, I want one minimal top bar so compositor state and daily text status are visible.
-2. As a River user, I want Machi workspace, panel, mode, window count and title from one authoritative snapshot.
+2. As a River user, I want the current title on the left and Machi workspace and panel positions on the right from one authoritative snapshot.
 3. As a River user, I want the active `us`/`ru` layout visible.
 4. As a user, I want Org timeblock and current clock text preserved.
 5. As a user, I want connected WireGuard names visible.

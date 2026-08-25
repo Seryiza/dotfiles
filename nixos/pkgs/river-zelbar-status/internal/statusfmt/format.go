@@ -74,25 +74,20 @@ func Format(snapshot model.Snapshot) ([]byte, error) {
 }
 
 func formattedParts(snapshot model.Snapshot) ([]string, []string, error) {
-	left := make([]string, 0, 5)
+	left := make([]string, 0, 1)
+	right := make([]string, 0, 10)
 	if snapshot.Machi.Valid {
-		if snapshot.Machi.WorkspaceCount > 0 {
-			left = append(left, fmt.Sprintf("W %d/%d", snapshot.Machi.WorkspaceIndex+1, snapshot.Machi.WorkspaceCount))
-		}
-		if snapshot.Machi.PanelCount > 0 {
-			left = append(left, fmt.Sprintf("P %d/%d", snapshot.Machi.PanelIndex+1, snapshot.Machi.PanelCount))
-		}
-		mode, err := Sanitize(snapshot.Machi.Mode, 64)
-		if err != nil {
-			return nil, nil, fmt.Errorf("Machi mode: %w", err)
-		}
-		left = appendNonempty(left, mode)
-		left = append(left, fmt.Sprintf("%dw", snapshot.Machi.WindowCount))
 		title, err := Sanitize(snapshot.Machi.Title, 2048)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Machi title: %w", err)
 		}
 		left = appendNonempty(left, title)
+		if snapshot.Machi.WorkspaceCount > 0 {
+			right = append(right, fmt.Sprintf("W %d/%d", snapshot.Machi.WorkspaceIndex+1, snapshot.Machi.WorkspaceCount))
+		}
+		if snapshot.Machi.PanelCount > 0 {
+			right = append(right, fmt.Sprintf("P %d/%d", snapshot.Machi.PanelIndex+1, snapshot.Machi.PanelCount))
+		}
 	}
 
 	rightValues := []struct {
@@ -109,7 +104,6 @@ func formattedParts(snapshot model.Snapshot) ([]string, []string, error) {
 		{"battery", snapshot.Battery, 64},
 		{"clock", snapshot.Clock, 64},
 	}
-	right := make([]string, 0, len(rightValues))
 	for _, field := range rightValues {
 		value, err := Sanitize(field.value, field.limit)
 		if err != nil {
@@ -128,7 +122,11 @@ func appendNonempty(parts []string, value string) []string {
 }
 
 func buildFrame(left, right []string) string {
-	return "%{l}" + join(left, " · ") + "%{r}" + join(right, " | ") + " \n"
+	leftText := join(left, " · ")
+	if leftText != "" {
+		leftText = "%{X:4}" + leftText
+	}
+	return "%{l}" + leftText + "%{r}" + join(right, " | ") + " \n"
 }
 
 func join(parts []string, separator string) string {
