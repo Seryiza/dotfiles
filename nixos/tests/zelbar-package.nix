@@ -28,6 +28,12 @@ assert (zelbar.patches or [ ]) == [ ];
 assert !(zelbar ? prePatch);
 assert !(zelbar ? postPatch);
 assert !(zelbar ? patchPhase);
+assert !(zelbar ? preConfigure);
+assert !(zelbar ? configurePhase);
+assert zelbar.postConfigure == ''
+  cp -rLT ${zelbar.zigDeps} "$ZIG_GLOBAL_CACHE_DIR/p"
+  chmod -R u+w "$ZIG_GLOBAL_CACHE_DIR/p"
+'';
 pkgs.runCommand "zelbar-package-check"
   {
     nativeBuildInputs = [ pkgs.diffutils ];

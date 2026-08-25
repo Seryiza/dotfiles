@@ -21,7 +21,9 @@ pkgs.runCommand "zelbar-runtime-check"
     grep -F 'unix.AF_UNIX, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC' \
       "$renderer_src/packet_linux.go"
     test "$(grep -c 'unix.Send(fd, frame' "$renderer_src/packet_linux.go")" -eq 1
-    ! grep -R -E 'os\.Pipe|io\.Pipe|StdinPipe|StdoutPipe|SOCK_STREAM' "$renderer_src"
+    ! grep -R -E \
+      'os\.Pipe|io\.Pipe|unix\.Pipe|syscall\.Pipe|Pipe2|StdinPipe|StdoutPipe|SOCK_STREAM' \
+      "$renderer_src"
 
     grep -F 'cmd.Stdin = child' "$renderer_src/zelbar_linux.go"
     grep -F 'cmd.Stdout = devNull' "$renderer_src/zelbar_linux.go"

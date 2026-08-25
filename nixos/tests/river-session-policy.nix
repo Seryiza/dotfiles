@@ -127,8 +127,7 @@ pkgs.runCommand "river-session-policy-check"
     river_waybar="$river_wants/waybar@river.service"
     test -L "$river_zelbar"
     test ! -e "$river_waybar"
-    test "$(find "$river_wants" -maxdepth 1 -type l \
-      \( -name 'waybar*.service' -o -name 'zelbar*.service' \) | wc -l)" -eq 1
+    test "$(find "$river_wants" -maxdepth 1 -type l -name '*.service' | wc -l)" -eq 1
     grep -F 'BindsTo=wayland-session@river.target' "$river_zelbar"
 
     touch "$out"

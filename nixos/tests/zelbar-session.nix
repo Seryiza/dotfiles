@@ -26,8 +26,7 @@ pkgs.runCommand "zelbar-session-check"
     test ! -e "$river_wants/waybar@river.service"
 
     test "$(find "$unit_dir" -type l -path '*.target.wants/zelbar*.service' | wc -l)" -eq 1
-    test "$(find "$river_wants" -maxdepth 1 -type l \
-      \( -name 'waybar*.service' -o -name 'zelbar*.service' \) | wc -l)" -eq 1
+    test "$(find "$river_wants" -maxdepth 1 -type l -name '*.service' | wc -l)" -eq 1
 
     grep -F 'After=wayland-session@river.target graphical-session.target' "$unit"
     grep -F 'BindsTo=wayland-session@river.target' "$unit"
