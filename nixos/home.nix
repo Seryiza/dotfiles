@@ -9,6 +9,7 @@ in {
     ./home/packages.nix
     ./home/alacritty.nix
     ./home/waybar.nix
+    ./home/zelbar.nix
     ./home/email.nix
     ./home/xremap.nix
     ./home/smooth-scroll.nix

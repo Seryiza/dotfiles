@@ -222,7 +222,6 @@ let
 
   profileBySessionIdentity = {
     mango = "mango";
-    river = "generic";
     sway = "generic";
   };
   profileCases = lib.concatStringsSep "\n" (
