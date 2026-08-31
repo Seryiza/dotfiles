@@ -267,16 +267,21 @@ instead.  Return non-nil when Emacs handled the close request."
 
 (use-package corfu
   :ensure t
-  :init (global-corfu-mode 1)
+
+  :init
+  (global-corfu-mode 1)
+
   :bind
   (:map corfu-map
         ("C-n" . corfu-next)
         ("C-p" . corfu-previous))
+
   :custom
   (corfu-auto t)
   (corfu-auto-prefix 2)
   (corfu-auto-delay 0.05)
-  (corfu-auto-trigger "."))
+  (corfu-auto-trigger ".")
+  (corfu-preselect 'prompt))
 
 (use-package corfu-popupinfo
   :after corfu
