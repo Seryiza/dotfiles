@@ -27,6 +27,8 @@
     iwmenu.url = "github:e-tho/iwmenu";
     rep.url = "github:eraserhd/rep";
     llm-agents.url = "github:numtide/llm-agents.nix";
+    # TODO: Remove the commit pin after https://github.com/can1357/oh-my-pi/pull/10281 is merged.
+    omp.url = "github:can1357/oh-my-pi/42c80b2d1e4f86a4f302f7835fec0687158759a5";
     sysc-greet = {
       url = "github:Nomadcxx/sysc-greet";
       inputs.nixpkgs.follows = "nixpkgs";

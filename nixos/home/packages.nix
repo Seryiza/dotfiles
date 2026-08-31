@@ -1,5 +1,4 @@
 {
-  config,
   pkgs,
   nixpkgs-unstable,
   ...
@@ -11,7 +10,6 @@ let
     config.allowUnfree = true;
   };
   llm-agents-pkgs = inputs.llm-agents.packages.${system};
-  goose-desktop = pkgs.callPackage ../pkgs/goose-desktop.nix { };
   glamoroustoolkit-vm = unstable-pkgs.glamoroustoolkit.overrideAttrs (_: rec {
     version = "1.1.67";
     src = unstable-pkgs.fetchzip {
@@ -27,40 +25,6 @@ let
       "/bin"
       "/share"
     ];
-  };
-  jan-wayland = pkgs.symlinkJoin {
-    name = "jan-wayland";
-    paths = [ unstable-pkgs.jan ];
-    postBuild = ''
-      mkdir -p "$out/bin" "$out/libexec"
-
-      cat > "$out/libexec/jan-wayland-apprun" <<'EOF'
-      #!${pkgs.bash}/bin/bash
-      set -euo pipefail
-
-      source "$APPDIR/apprun-hooks/linuxdeploy-plugin-gtk.sh"
-      export GTK_CSD=0
-      export GDK_BACKEND=wayland
-      export WINIT_UNIX_BACKEND=wayland
-      export XCURSOR_THEME='${config.home.pointerCursor.name}'
-      export XCURSOR_SIZE='${toString config.home.pointerCursor.size}'
-      export XCURSOR_PATH='${config.home.pointerCursor.package}/share/icons:${pkgs.adwaita-icon-theme}/share/icons'"''${XCURSOR_PATH:+:$XCURSOR_PATH}"
-
-      exec "$APPDIR/AppRun.wrapped" "$@"
-      EOF
-      chmod +x "$out/libexec/jan-wayland-apprun"
-
-      rm -f "$out/bin/Jan"
-      cat > "$out/bin/Jan" <<'EOF'
-      #!${pkgs.bash}/bin/bash
-      set -euo pipefail
-
-      export APPIMAGE_DEBUG_EXEC="@out@/libexec/jan-wayland-apprun"
-      exec ${unstable-pkgs.jan}/bin/Jan "$@"
-      EOF
-      substituteInPlace "$out/bin/Jan" --replace-fail '@out@' "$out"
-      chmod +x "$out/bin/Jan"
-    '';
   };
 in
 {
@@ -83,6 +47,7 @@ in
     llm-agents-pkgs.codex
     llm-agents-pkgs.codex-acp
     llm-agents-pkgs.pi
+    inputs.omp.packages.${system}.omp
     llm-agents-pkgs.opencode
     llm-agents-pkgs.qmd
     llm-agents-pkgs.spec-kit
@@ -96,8 +61,7 @@ in
     pkgs.dropbox
     pkgs.bun
     pkgs.mission-center
-    pkgs.telegram-desktop
-    goose-desktop
+    unstable-pkgs.telegram-desktop
     glamoroustoolkit
     # unstable because of https://github.com/NixOS/nixpkgs/issues/500724
     unstable-pkgs.enpass
@@ -146,7 +110,6 @@ in
     pkgs.silver-searcher
     unstable-pkgs.clj-kondo
     unstable-pkgs.cljfmt
-    jan-wayland
     pkgs.ntfs3g
     pkgs.libnotify
     pkgs.iw
@@ -163,7 +126,7 @@ in
     pkgs.geckodriver
     pkgs.amberol
     pkgs.gcc
-    pkgs.nodejs_22
+    pkgs.nodejs
     pkgs.unzip
     pkgs.clojure
     pkgs.babashka
@@ -188,7 +151,6 @@ in
     pkgs.vtsls
     pkgs.typescript-language-server
     pkgs.devd
-    pkgs.anytype
     pkgs.gnome-calendar
     pkgs.php
     pkgs.bbin
@@ -199,10 +161,8 @@ in
     pkgs.loupe
     pkgs.nautilus
     pkgs.exercism
-    unstable-pkgs.brotab
     unstable-pkgs.ollama
     unstable-pkgs.llama-cpp
-    unstable-pkgs.heynote
     pkgs.gnome-font-viewer
     pkgs.ghostty
     pkgs.pnpm
