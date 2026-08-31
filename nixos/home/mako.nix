@@ -1,18 +1,25 @@
 { pkgs, ... }:
 let
   volumeSound = "${pkgs.yaru-theme}/share/sounds/Yaru/stereo/audio-volume-change.oga";
+  patchedMako = pkgs.mako.overrideAttrs (oldAttrs: {
+    # Remove when https://github.com/emersion/mako/issues/655 is fixed upstream.
+    patches = (oldAttrs.patches or [ ]) ++ [
+      ../pkgs/mako-retry-busy-buffer.patch
+    ];
+  });
 in
 {
   services.mako = {
     enable = true;
+    package = patchedMako;
     settings = {
       icons = false;
       "background-color" = "#000000";
       "text-color" = "#ffffff";
       "border-size" = 0;
+      layer = "overlay";
 
       "app-name=ya-vol" = {
-        layer = "overlay";
         history = 0;
         anchor = "top-center";
         group-by = "app-name";
@@ -22,15 +29,10 @@ in
       };
 
       "app-name=ya-backlight" = {
-        layer = "overlay";
         history = 0;
         anchor = "top-center";
         group-by = "app-name";
         format = "<b>%s</b>%b";
-      };
-
-      "app-name=volume group-index=0" = {
-        invisible = 0;
       };
     };
   };
