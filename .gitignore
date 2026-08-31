@@ -23,6 +23,7 @@
 /dotfiles/emacs/emacs-backup
 /dotfiles/emacs/auto-save-list
 /dotfiles/emacs/projectile-bookmarks.eld
+/dotfiles/emacs/projectile-frecency.eld
 /dotfiles/emacs/package-quickstart.el
 /dotfiles/emacs/projects
 /dotfiles/emacs/persist
