@@ -115,7 +115,7 @@ in
         close=super+u
 
         [keybindings.spawn]
-        alacritty=super+return
+        alacritty=super+y
         ${pkgs.swaylock}/bin/swaylock -c 000000=super+escape
         ${pkgs.uwsm}/bin/uwsm stop=super+shift+e
         ${pkgs.wmenu}/bin/wmenu-run -i -b -l 10 -f 'Iosevka 14'=super+n
