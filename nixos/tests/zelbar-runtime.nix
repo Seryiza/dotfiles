@@ -8,14 +8,22 @@ assert river-zelbar-status.vendorHash == "sha256-YKqCeXbHaaxoHmUC1/4Z0GIym3qxcqz
 assert river-zelbar-status.doCheck;
 pkgs.runCommand "zelbar-runtime-check"
   {
-    nativeBuildInputs = [ pkgs.gnugrep ];
+    nativeBuildInputs = [ pkgs.coreutils pkgs.emacs-pgtk pkgs.gnugrep ];
   }
   ''
     status_src=${river-zelbar-status.src}
     renderer_src="$status_src/internal/renderer"
+    emacs_src=${../../dotfiles/emacs}
 
     test -x ${river-zelbar-status}/bin/river-zelbar-status
     test "$(${zelbar}/bin/zelbar -version 2>&1)" = 1.2.0
+    runtime="$(mktemp -d)"
+    trap 'rm -rf "$runtime"' EXIT
+    XDG_RUNTIME_DIR="$runtime" \
+      ${pkgs.emacs-pgtk}/bin/emacs --batch -Q \
+      -l "$emacs_src/tests/sz-org-status-test.el" \
+      -f ert-run-tests-batch-and-exit
+
 
     grep -F 'const MaxPacketBytes = 4096' "$renderer_src/packet_linux.go"
     grep -F 'unix.AF_UNIX, unix.SOCK_SEQPACKET|unix.SOCK_CLOEXEC' \

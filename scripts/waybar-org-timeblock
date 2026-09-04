@@ -4,29 +4,57 @@ set -eu
 SYSTEMCTL="${SYSTEMCTL:-/run/current-system/sw/bin/systemctl}"
 EMACSCLIENT="${EMACSCLIENT:-emacsclient}"
 EMACS_SERVICE="${EMACS_SERVICE:-emacs.service}"
+case "$#" in
+  0)
+    form='(sz/org-waybar-current-scheduled-timeblock)'
+    state=false
+    ;;
+  1)
+    if [ "$1" != --state ]; then
+      printf 'usage: %s [--state]\n' "$0" >&2
+      exit 2
+    fi
+    form='(sz/org-waybar-timeblock-state-payload)'
+    state=true
+    ;;
+  *)
+    printf 'usage: %s [--state]\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
+print_empty() {
+  if "$state"; then printf '\n'; else printf '\n\n\n'; fi
+}
+
 # Only query the Emacs daemon managed by the systemd user service.
 # Do not pass emacsclient -a/--alternate-editor: that would spawn a new Emacs
 # daemon when the service/socket is unavailable.
 if ! "$SYSTEMCTL" --user is-active --quiet "$EMACS_SERVICE" 2>/dev/null; then
-  printf '\n\n\n'
+  print_empty
   exit 0
 fi
 
 if [ -n "${EMACS_SOCKET:-}" ]; then
-  if ! out="$("$EMACSCLIENT" --socket-name="$EMACS_SOCKET" --eval '(sz/org-waybar-current-scheduled-timeblock)' 2>/dev/null)"; then
-    printf '\n\n\n'
+  if ! out="$("$EMACSCLIENT" --socket-name="$EMACS_SOCKET" --eval "$form" 2>/dev/null)"; then
+    print_empty
     exit 0
   fi
-else
-  if ! out="$("$EMACSCLIENT" --eval '(sz/org-waybar-current-scheduled-timeblock)' 2>/dev/null)"; then
-    printf '\n\n\n'
-    exit 0
-  fi
+elif ! out="$("$EMACSCLIENT" --eval "$form" 2>/dev/null)"; then
+  print_empty
+  exit 0
+fi
+
+case "$out" in
+  \"*\") out=${out#\"}; out=${out%\"} ;;
+esac
+if "$state"; then
+  printf '%s\n' "$out"
+  exit 0
 fi
 
 case "$out" in
   nil|"") printf '\n\n\n'; exit 0 ;;
-  \"*\") out=${out#\"}; out=${out%\"} ;;
 esac
 
 printf '%b\n\n\n' "$out"

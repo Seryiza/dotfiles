@@ -20,11 +20,6 @@ let
     runtimeInputs = [ systemd emacs ];
     text = builtins.readFile ../../../scripts/waybar-org-timeblock;
   };
-  orgClock = writeShellApplication {
-    name = "waybar-org-current-clock";
-    runtimeInputs = [ systemd emacs ];
-    text = builtins.readFile ../../../scripts/waybar-org-current-clock;
-  };
   wireGuard = writeShellApplication {
     name = "waybar-wireguard";
     runtimeInputs = [ bash coreutils gawk jq networkmanager ];
@@ -43,7 +38,6 @@ buildGoModule {
     "-X main.zelbarDefault=${zelbar}/bin/zelbar"
     "-X main.machictlDefault=${machi}/bin/machictl"
     "-X main.orgTimeblockDefault=${orgTimeblock}/bin/waybar-org-timeblock"
-    "-X main.orgClockDefault=${orgClock}/bin/waybar-org-current-clock"
     "-X main.wireGuardDefault=${wireGuard}/bin/waybar-wireguard"
     "-X main.wpctlDefault=${wireplumber}/bin/wpctl"
     "-X main.nmcliDefault=${networkmanager}/bin/nmcli"

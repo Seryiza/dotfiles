@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -12,7 +13,6 @@ import (
 
 	"seryiza.local/river-zelbar-status/internal/engine"
 	"seryiza.local/river-zelbar-status/internal/machi"
-	"seryiza.local/river-zelbar-status/internal/model"
 	"seryiza.local/river-zelbar-status/internal/renderer"
 	"seryiza.local/river-zelbar-status/internal/riverxkb"
 	"seryiza.local/river-zelbar-status/internal/statusfmt"
@@ -23,7 +23,6 @@ var (
 	zelbarDefault       string
 	machictlDefault     string
 	orgTimeblockDefault string
-	orgClockDefault     string
 	wireGuardDefault    string
 	wpctlDefault        string
 	nmcliDefault        string
@@ -53,7 +52,6 @@ func run() error {
 		"--zelbar":               *zelbarPath,
 		"--machictl":             *machictlPath,
 		"packaged org-timeblock": orgTimeblockDefault,
-		"packaged org-clock":     orgClockDefault,
 		"packaged wireguard":     wireGuardDefault,
 		"packaged wpctl":         wpctlDefault,
 		"packaged nmcli":         nmcliDefault,
@@ -62,6 +60,11 @@ func run() error {
 		if path == "" || !filepath.IsAbs(path) {
 			return fmt.Errorf("configuration: %s must be an absolute executable path", name)
 		}
+	}
+
+	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
+	if !filepath.IsAbs(runtimeDir) {
+		return errors.New("configuration: XDG_RUNTIME_DIR must be an absolute path")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -83,8 +86,8 @@ func run() error {
 	sources := []engine.Source{
 		machi.New(machi.Command{Path: *machictlPath}, output),
 		riverxkb.NewSource(),
-		statussource.NewOrg(statussource.Command{Path: orgTimeblockDefault}, model.FieldOrgTimeblock, runner),
-		statussource.NewOrg(statussource.Command{Path: orgClockDefault}, model.FieldOrgClock, runner),
+		statussource.NewOrgTimeblock(statussource.Command{Path: orgTimeblockDefault, Args: []string{"--state"}}, runner, nil),
+		statussource.NewOrgClock(filepath.Join(runtimeDir, "river-zelbar-status-org-clock")),
 		statussource.NewAudio(statussource.Command{Path: wpctlDefault}, runner),
 		statussource.NewNetwork(statussource.Command{Path: nmcliDefault}, runner),
 		statussource.NewWireGuard(statussource.Command{Path: wireGuardDefault}, runner),

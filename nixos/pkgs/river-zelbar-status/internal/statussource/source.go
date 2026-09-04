@@ -4,9 +4,12 @@ package statussource
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io"
 	"math"
 	"os"
@@ -119,11 +122,7 @@ func (source *pollingSource) Run(ctx context.Context, sink engine.Sink) error {
 		update := model.FieldUpdate(source.field, value)
 		if err != nil {
 			update = model.FieldUpdate(source.field, source.failureValue)
-			now := source.now()
-			if lastWarning.IsZero() || now.Sub(lastWarning) >= 5*time.Minute {
-				event.Warning = &engine.Fault{Class: engine.Nonfatal, Source: source.name, Err: err}
-				lastWarning = now
-			}
+			event.Warning = throttledNonfatal(source.name, err, source.now(), &lastWarning)
 		}
 		event.Update = &update
 		if publishErr := sink.Publish(ctx, event); publishErr != nil {
@@ -137,6 +136,14 @@ func (source *pollingSource) Run(ctx context.Context, sink engine.Sink) error {
 	}
 }
 
+func throttledNonfatal(source string, err error, now time.Time, lastWarning *time.Time) *engine.Fault {
+	if !(*lastWarning).IsZero() && now.Sub(*lastWarning) < 5*time.Minute {
+		return nil
+	}
+	*lastWarning = now
+	return &engine.Fault{Class: engine.Nonfatal, Source: source, Err: err}
+}
+
 func newPolling(name string, field model.Field, interval, timeout time.Duration, failure string, sample sampleFunc) engine.Source {
 	return &pollingSource{name: name, field: field, interval: interval, timeout: timeout, failureValue: failure, sample: sample, now: time.Now}
 }
@@ -148,23 +155,241 @@ func runnerOrDefault(runner Runner) Runner {
 	return runner
 }
 
-func NewOrg(command Command, field model.Field, runner Runner) engine.Source {
-	runner = runnerOrDefault(runner)
-	name := "org-timeblock"
-	if field == model.FieldOrgClock {
-		name = "org-clock"
+type orgClockSource struct{ snapshotPath string }
+
+func NewOrgClock(snapshotPath string) engine.Source {
+	return &orgClockSource{snapshotPath: snapshotPath}
+}
+
+func (source *orgClockSource) Run(ctx context.Context, sink engine.Sink) error {
+	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC | unix.IN_NONBLOCK)
+	if err != nil {
+		return fmt.Errorf("org clock inotify: %w", err)
 	}
-	return newPolling(name, field, 15*time.Second, 5*time.Second, "", func(ctx context.Context) (string, error) {
-		output, err := runner.Run(ctx, command)
-		if err != nil {
-			return "", err
-		}
-		line, _, _ := bytes.Cut(output, []byte{'\n'})
-		if !utf8.Valid(line) {
-			return "", errors.New("first line is not valid UTF-8")
-		}
-		return strings.TrimSuffix(string(line), "\r"), nil
+	pipe := [2]int{}
+	if err := unix.Pipe2(pipe[:], unix.O_CLOEXEC|unix.O_NONBLOCK); err != nil {
+		_ = unix.Close(fd)
+		return fmt.Errorf("org clock cancellation pipe: %w", err)
+	}
+	done := make(chan struct{})
+	stopWake := context.AfterFunc(ctx, func() {
+		defer close(done)
+		_, _ = unix.Write(pipe[1], []byte{1})
 	})
+	defer func() {
+		if !stopWake() {
+			<-done
+		}
+		_ = unix.Close(pipe[0])
+		_ = unix.Close(pipe[1])
+		_ = unix.Close(fd)
+	}()
+
+	parent := filepath.Dir(source.snapshotPath)
+	name := filepath.Base(source.snapshotPath)
+	nameBytes := []byte(name)
+	wd, err := unix.InotifyAddWatch(fd, parent, unix.IN_MOVED_TO|unix.IN_CLOSE_WRITE|unix.IN_DELETE|unix.IN_DELETE_SELF|unix.IN_MOVE_SELF)
+	if err != nil {
+		return fmt.Errorf("org clock watch %q: %w", parent, err)
+	}
+	lastWarning := time.Time{}
+	if err := source.publish(ctx, sink, &lastWarning); err != nil {
+		return err
+	}
+
+	buffer := make([]byte, 4096)
+	for {
+		ready := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}, {Fd: int32(pipe[0]), Events: unix.POLLIN}}
+		if _, err := unix.Poll(ready, -1); err != nil {
+			if err == unix.EINTR {
+				continue
+			}
+			return fmt.Errorf("org clock poll: %w", err)
+		}
+		if ready[1].Revents != 0 {
+			return ctx.Err()
+		}
+		if ready[0].Revents&(unix.POLLERR|unix.POLLHUP|unix.POLLNVAL) != 0 {
+			return errors.New("org clock inotify descriptor failure")
+		}
+
+		length, err := unix.Read(fd, buffer)
+		if err != nil {
+			if err == unix.EAGAIN {
+				continue
+			}
+			return fmt.Errorf("org clock inotify read: %w", err)
+		}
+		changed := false
+		for offset := 0; offset < length; {
+			if length-offset < unix.SizeofInotifyEvent {
+				return errors.New("org clock malformed inotify event")
+			}
+			event := buffer[offset:]
+			mask := binary.NativeEndian.Uint32(event[4:8])
+			eventWD := int32(binary.NativeEndian.Uint32(event[:4]))
+			nameLength := int(binary.NativeEndian.Uint32(event[12:16]))
+			offset += unix.SizeofInotifyEvent
+			if nameLength > length-offset {
+				return errors.New("org clock malformed inotify event name")
+			}
+			eventName := bytes.TrimRight(event[unix.SizeofInotifyEvent:unix.SizeofInotifyEvent+nameLength], "\x00")
+			offset += nameLength
+
+			if mask&unix.IN_Q_OVERFLOW != 0 {
+				changed = true
+				continue
+			}
+			if eventWD != int32(wd) {
+				return errors.New("org clock unexpected inotify watch descriptor")
+			}
+			if mask&(unix.IN_IGNORED|unix.IN_UNMOUNT|unix.IN_DELETE_SELF|unix.IN_MOVE_SELF) != 0 {
+				return errors.New("org clock watch lost")
+			}
+			if bytes.Equal(eventName, nameBytes) && mask&(unix.IN_MOVED_TO|unix.IN_CLOSE_WRITE|unix.IN_DELETE) != 0 {
+				changed = true
+			}
+		}
+		if changed {
+			if err := source.publish(ctx, sink, &lastWarning); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (source *orgClockSource) publish(ctx context.Context, sink engine.Sink, lastWarning *time.Time) error {
+	value, err := readOrgClockSnapshot(source.snapshotPath)
+	event := engine.Event{}
+	if err != nil {
+		value = ""
+		event.Warning = throttledNonfatal("org-clock", err, time.Now(), lastWarning)
+	}
+	update := model.FieldUpdate(model.FieldOrgClock, value)
+	event.Update = &update
+	return sink.Publish(ctx, event)
+}
+
+func readOrgClockSnapshot(path string) (string, error) {
+	value, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	value = bytes.TrimSuffix(value, []byte{'\n'})
+	if bytes.Contains(value, []byte{'\n'}) {
+		return "", errors.New("clock snapshot contains an embedded newline")
+	}
+	if !utf8.Valid(value) {
+		return "", errors.New("clock snapshot is not valid UTF-8")
+	}
+	return string(value), nil
+}
+
+type orgTimeblockState struct {
+	text     string
+	deadline time.Time
+}
+
+type orgTimeblockSource struct {
+	command Command
+	runner  Runner
+	clock   Clock
+}
+
+func NewOrgTimeblock(command Command, runner Runner, clock Clock) engine.Source {
+	if clock == nil {
+		clock = WallClock{}
+	}
+	return &orgTimeblockSource{command: command, runner: runnerOrDefault(runner), clock: clock}
+}
+
+func (source *orgTimeblockSource) Run(ctx context.Context, sink engine.Sink) error {
+	lastWarning := time.Time{}
+	for {
+		state, err := source.query(ctx)
+		if err == nil && !state.deadline.IsZero() && !state.deadline.After(source.clock.Now()) {
+			state, err = source.query(ctx)
+			if err == nil && !state.deadline.After(source.clock.Now()) {
+				state.deadline = time.Time{}
+			}
+		}
+
+		event := engine.Event{}
+		if err != nil {
+			state = orgTimeblockState{}
+			event.Warning = throttledNonfatal("org-timeblock", err, source.clock.Now(), &lastWarning)
+		}
+		update := model.FieldUpdate(model.FieldOrgTimeblock, state.text)
+		event.Update = &update
+		if err := sink.Publish(ctx, event); err != nil {
+			return err
+		}
+
+		now := source.clock.Now()
+		recovery := orgTimeblockRecovery(now)
+		if !recovery.After(now) {
+			return errors.New("org timeblock recovery is not in the future")
+		}
+		if !state.deadline.IsZero() && state.deadline.Before(recovery) {
+			recovery = state.deadline
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-source.clock.After(recovery.Sub(now)):
+		}
+	}
+}
+
+func (source *orgTimeblockSource) query(ctx context.Context) (orgTimeblockState, error) {
+	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	output, err := source.runner.Run(queryCtx, source.command)
+	if err != nil {
+		return orgTimeblockState{}, err
+	}
+	return parseOrgTimeblockPayload(output)
+}
+
+func parseOrgTimeblockPayload(output []byte) (orgTimeblockState, error) {
+	line, rest, found := bytes.Cut(output, []byte{'\n'})
+	if !found || len(bytes.TrimSpace(rest)) != 0 {
+		return orgTimeblockState{}, errors.New("timeblock command returned unexpected output")
+	}
+	if len(line) == 0 {
+		return orgTimeblockState{}, nil
+	}
+	payload, err := base64.StdEncoding.DecodeString(string(line))
+	if err != nil {
+		return orgTimeblockState{}, fmt.Errorf("decode timeblock payload: %w", err)
+	}
+	if !utf8.Valid(payload) {
+		return orgTimeblockState{}, errors.New("timeblock payload is not valid UTF-8")
+	}
+	var payloadState struct {
+		Text           *string `json:"text"`
+		NextTransition *int64  `json:"next_transition"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(payload))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payloadState); err != nil {
+		return orgTimeblockState{}, fmt.Errorf("decode timeblock JSON: %w", err)
+	}
+	if payloadState.Text == nil || payloadState.NextTransition == nil || *payloadState.NextTransition <= 0 {
+		return orgTimeblockState{}, errors.New("timeblock payload is missing required fields")
+	}
+	if err := rejectTrailingJSON(decoder); err != nil {
+		return orgTimeblockState{}, err
+	}
+	return orgTimeblockState{text: *payloadState.Text, deadline: time.Unix(*payloadState.NextTransition, 0)}, nil
+}
+
+func orgTimeblockRecovery(now time.Time) time.Time {
+	return now.Add(10*time.Minute - (time.Duration(now.Minute()%10)*time.Minute +
+		time.Duration(now.Second())*time.Second + time.Duration(now.Nanosecond())))
 }
 
 func NewWireGuard(command Command, runner Runner) engine.Source {

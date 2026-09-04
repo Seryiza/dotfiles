@@ -2,10 +2,14 @@ package statussource
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,6 +50,35 @@ func (sink *cancelSink) event(index int) engine.Event {
 	sink.mu.Lock()
 	defer sink.mu.Unlock()
 	return sink.events[index]
+}
+
+type eventSink struct{ events chan engine.Event }
+
+func (sink *eventSink) Publish(_ context.Context, event engine.Event) error {
+	sink.events <- event
+	return nil
+}
+
+func nextEvent(t *testing.T, sink *eventSink) engine.Event {
+	t.Helper()
+	select {
+	case event := <-sink.events:
+		return event
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for source event")
+		return engine.Event{}
+	}
+}
+
+type gateSink struct {
+	events  chan engine.Event
+	release chan struct{}
+}
+
+func (sink *gateSink) Publish(_ context.Context, event engine.Event) error {
+	sink.events <- event
+	<-sink.release
+	return nil
 }
 
 func runFirst(t *testing.T, source engine.Source) engine.Event {
@@ -89,27 +122,340 @@ func fieldValue(snapshot model.Snapshot, field model.Field) string {
 	}
 }
 
-func TestOrgFirstLineAndFailures(t *testing.T) {
+func timeblockPayload(t *testing.T, text string, transition time.Time) []byte {
+	t.Helper()
+	body, err := json.Marshal(struct {
+		Text           string `json:"text"`
+		NextTransition int64  `json:"next_transition"`
+	}{text, transition.Unix()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append([]byte(base64.StdEncoding.EncodeToString(body)), '\n')
+}
+
+func timeblockRaw(raw []byte) []byte {
+	return append([]byte(base64.StdEncoding.EncodeToString(raw)), '\n')
+}
+
+func waitForSourceWait(t *testing.T, clock *fakeClock) time.Duration {
+	t.Helper()
+	select {
+	case <-clock.waited:
+		clock.mu.Lock()
+		defer clock.mu.Unlock()
+		return clock.waits[len(clock.waits)-1]
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for source timer")
+		return 0
+	}
+}
+
+func TestOrgClockWatchesAtomicSnapshots(t *testing.T) {
+	runtimeDir := t.TempDir()
+	snapshot := filepath.Join(runtimeDir, "river-zelbar-status-org-clock")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sink := &eventSink{events: make(chan engine.Event, 4)}
+	result := make(chan error, 1)
+	go func() { result <- NewOrgClock(snapshot).Run(ctx, sink) }()
+
+	if got := eventValue(nextEvent(t, sink), model.FieldOrgClock); got != "" {
+		t.Fatalf("initial clock = %q, want empty", got)
+	}
+	temporary, err := os.CreateTemp(runtimeDir, ".clock-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := temporary.WriteString("Meeting\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := temporary.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(temporary.Name(), snapshot); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case event := <-sink.events:
+		if got := eventValue(event, model.FieldOrgClock); got != "Meeting" {
+			t.Fatalf("renamed clock = %q, want Meeting", got)
+		}
+	case err := <-result:
+		t.Fatalf("source stopped after rename: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for renamed clock")
+	}
+	if err := os.Remove(snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if got := eventValue(nextEvent(t, sink), model.FieldOrgClock); got != "" {
+		t.Fatalf("deleted clock = %q, want empty", got)
+	}
+
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run() = %v, want cancellation", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("source did not leave idle poll after cancellation")
+	}
+}
+
+func TestOrgClockStopsWhenRuntimeDirectoryMoves(t *testing.T) {
+	runtimeDir := t.TempDir()
+	movedRuntimeDir := runtimeDir + "-moved"
+	defer os.RemoveAll(movedRuntimeDir)
+	snapshot := filepath.Join(runtimeDir, "river-zelbar-status-org-clock")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sink := &eventSink{events: make(chan engine.Event, 1)}
+	result := make(chan error, 1)
+	go func() { result <- NewOrgClock(snapshot).Run(ctx, sink) }()
+	_ = nextEvent(t, sink)
+	if err := os.Rename(runtimeDir, movedRuntimeDir); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-result:
+		if err == nil || errors.Is(err, context.Canceled) {
+			t.Fatalf("Run() = %v, want watch-loss error", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("source did not stop when its runtime directory moved")
+	}
+}
+
+func TestOrgClockRereadsAfterInotifyQueueOverflow(t *testing.T) {
+	limitText, err := os.ReadFile("/proc/sys/fs/inotify/max_queued_events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	limit, err := strconv.Atoi(strings.TrimSpace(string(limitText)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimeDir := t.TempDir()
+	snapshot := filepath.Join(runtimeDir, "river-zelbar-status-org-clock")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sink := &gateSink{events: make(chan engine.Event, 2), release: make(chan struct{})}
+	result := make(chan error, 1)
+	go func() { result <- NewOrgClock(snapshot).Run(ctx, sink) }()
+	if got := eventValue(<-sink.events, model.FieldOrgClock); got != "" {
+		t.Fatalf("initial clock = %q, want empty", got)
+	}
+	for range limit/2 + 2 {
+		file, err := os.CreateTemp(runtimeDir, ".flood-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(snapshot, []byte("Overflow\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	close(sink.release)
+	select {
+	case event := <-sink.events:
+		if got := eventValue(event, model.FieldOrgClock); got != "Overflow" {
+			t.Fatalf("overflow clock = %q, want Overflow", got)
+		}
+	case err := <-result:
+		t.Fatalf("source stopped after overflow: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for overflow reread")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run() = %v, want cancellation", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("source did not leave idle poll after cancellation")
+	}
+}
+
+func TestOrgTimeblockImmediateSampling(t *testing.T) {
+	next := time.Unix(1_800_000_000, 0)
 	for _, test := range []struct {
 		name string
-		out  string
-		err  error
+		out  []byte
 		want string
-		warn bool
 	}{
-		{"valid", "Plan today\nignored\n", nil, "Plan today", false},
-		{"empty", "\nignored\n", nil, "", false},
-		{"malformed", string([]byte{0xff, '\n'}), nil, "", true},
-		{"timeout", "", context.DeadlineExceeded, "", true},
-		{"nonzero exit", "", errors.New("exit status 7"), "", true},
+		{"valid", timeblockPayload(t, "Plan today", next), "Plan today"},
+		{"empty unavailable", []byte("\n"), ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			runner := runnerFunc(func(context.Context, Command) ([]byte, error) { return []byte(test.out), test.err })
-			event := runFirst(t, NewOrg(Command{Path: "/store/org"}, model.FieldOrgTimeblock, runner))
-			if got := eventValue(event, model.FieldOrgTimeblock); got != test.want || (event.Warning != nil) != test.warn {
-				t.Fatalf("value/warning = %q/%v, want %q/%v", got, event.Warning, test.want, test.warn)
+			runner := runnerFunc(func(context.Context, Command) ([]byte, error) { return test.out, nil })
+			event := runFirst(t, NewOrgTimeblock(Command{Path: "/store/org"}, runner, nil))
+			if got := eventValue(event, model.FieldOrgTimeblock); got != test.want || event.Warning != nil {
+				t.Fatalf("value/warning = %q/%v, want %q/no warning", got, event.Warning, test.want)
 			}
 		})
+	}
+}
+
+func TestOrgTimeblockFailuresRecover(t *testing.T) {
+	location := time.FixedZone("local-test", 6*60*60)
+	now := time.Date(2026, time.September, 4, 10, 3, 20, 0, location)
+	for _, test := range []struct {
+		name string
+		out  []byte
+		err  error
+	}{
+		{"missing wrapper line", nil, nil},
+		{"invalid base64", []byte("not base64\n"), nil},
+		{"invalid UTF-8", timeblockRaw([]byte{0xff}), nil},
+		{"missing text", timeblockRaw([]byte(`{"next_transition":1}`)), nil},
+		{"nonpositive transition", timeblockRaw([]byte(`{"text":"x","next_transition":0}`)), nil},
+		{"unknown field", timeblockRaw([]byte(`{"text":"x","next_transition":1,"extra":true}`)), nil},
+		{"trailing JSON", timeblockRaw([]byte(`{"text":"x","next_transition":1} {}`)), nil},
+		{"extra command output", append(timeblockPayload(t, "x", now.Add(time.Minute)), []byte("noise\n")...), nil},
+		{"timeout", nil, context.DeadlineExceeded},
+		{"nonzero exit", nil, errors.New("exit status 7")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			clock := &fakeClock{now: now, wake: make(chan time.Time, 1), waited: make(chan struct{}, 2)}
+			recovered := timeblockPayload(t, "Recovered", now.Add(20*time.Minute))
+			calls := 0
+			runner := runnerFunc(func(context.Context, Command) ([]byte, error) {
+				calls++
+				if calls == 1 {
+					return test.out, test.err
+				}
+				return recovered, nil
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			sink := &eventSink{events: make(chan engine.Event, 2)}
+			done := make(chan error, 1)
+			go func() { done <- NewOrgTimeblock(Command{Path: "/store/org"}, runner, clock).Run(ctx, sink) }()
+			event := nextEvent(t, sink)
+			if got := eventValue(event, model.FieldOrgTimeblock); got != "" || event.Warning == nil {
+				t.Fatalf("failure value/warning = %q/%v, want empty/nonfatal warning", got, event.Warning)
+			}
+			recovery := now.Add(6*time.Minute + 40*time.Second)
+			if got := waitForSourceWait(t, clock); got != recovery.Sub(now) {
+				t.Fatalf("wait = %v, want %v", got, recovery.Sub(now))
+			}
+			clock.setNow(recovery)
+			clock.wake <- recovery
+			event = nextEvent(t, sink)
+			if got := eventValue(event, model.FieldOrgTimeblock); got != "Recovered" || event.Warning != nil {
+				t.Fatalf("recovered value/warning = %q/%v, want Recovered/no warning", got, event.Warning)
+			}
+			if calls != 2 {
+				t.Fatalf("calls = %d, want 2", calls)
+			}
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) {
+				t.Fatalf("Run() = %v, want cancellation", err)
+			}
+		})
+	}
+}
+
+func TestOrgTimeblockSchedulesTransitionsAndRecovery(t *testing.T) {
+	location := time.FixedZone("local-test", 6*60*60)
+	now := time.Date(2026, time.September, 4, 10, 3, 20, 0, location)
+	for _, test := range []struct {
+		name      string
+		out       []byte
+		wantWait  time.Duration
+		wantValue string
+		wantCalls int
+	}{
+		{"semantic transition wins", timeblockPayload(t, "Focus", now.Add(100*time.Second)), 100 * time.Second, "Focus", 1},
+		{"recovery at ten past", []byte("\n"), 6*time.Minute + 40*time.Second, "", 1},
+		{"recovery beats later transition", timeblockPayload(t, "Later", now.Add(12*time.Minute)), 6*time.Minute + 40*time.Second, "Later", 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			clock := &fakeClock{now: now, wake: make(chan time.Time), waited: make(chan struct{}, 1)}
+			calls := 0
+			runner := runnerFunc(func(context.Context, Command) ([]byte, error) {
+				calls++
+				return test.out, nil
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			sink := &eventSink{events: make(chan engine.Event, 1)}
+			done := make(chan error, 1)
+			go func() { done <- NewOrgTimeblock(Command{Path: "/store/org"}, runner, clock).Run(ctx, sink) }()
+			if got := eventValue(nextEvent(t, sink), model.FieldOrgTimeblock); got != test.wantValue {
+				t.Fatalf("value = %q, want %q", got, test.wantValue)
+			}
+			if got := waitForSourceWait(t, clock); got != test.wantWait {
+				t.Fatalf("wait = %v, want %v", got, test.wantWait)
+			}
+			cancel()
+			if err := <-done; !errors.Is(err, context.Canceled) {
+				t.Fatalf("Run() = %v, want cancellation", err)
+			}
+			if calls != test.wantCalls {
+				t.Fatalf("calls = %d, want %d", calls, test.wantCalls)
+			}
+		})
+	}
+}
+
+func TestOrgTimeblockRetriesOneStaleResponse(t *testing.T) {
+	now := time.Date(2026, time.September, 4, 10, 3, 20, 0, time.Local)
+	clock := &fakeClock{now: now, wake: make(chan time.Time), waited: make(chan struct{}, 1)}
+	outputs := [][]byte{timeblockPayload(t, "Stale", now), timeblockPayload(t, "Fresh", now.Add(time.Minute))}
+	calls := 0
+	runner := runnerFunc(func(context.Context, Command) ([]byte, error) {
+		output := outputs[calls]
+		calls++
+		return output, nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	sink := &eventSink{events: make(chan engine.Event, 1)}
+	done := make(chan error, 1)
+	go func() { done <- NewOrgTimeblock(Command{Path: "/store/org"}, runner, clock).Run(ctx, sink) }()
+	if got := eventValue(nextEvent(t, sink), model.FieldOrgTimeblock); got != "Fresh" {
+		t.Fatalf("value = %q, want Fresh", got)
+	}
+	if got := waitForSourceWait(t, clock); got != time.Minute {
+		t.Fatalf("wait = %v, want 1m", got)
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() = %v, want cancellation", err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2", calls)
+	}
+}
+
+func TestOrgTimeblockRecoveryDuringFallBack(t *testing.T) {
+	location, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.November, 1, 1, 3, 20, 0, location).Add(time.Hour)
+	clock := &fakeClock{now: now, wake: make(chan time.Time), waited: make(chan struct{}, 1)}
+	ctx, cancel := context.WithCancel(context.Background())
+	sink := &eventSink{events: make(chan engine.Event, 1)}
+	done := make(chan error, 1)
+	go func() {
+		done <- NewOrgTimeblock(Command{Path: "/store/org"}, runnerFunc(func(context.Context, Command) ([]byte, error) {
+			return timeblockPayload(t, "Later", now.Add(20*time.Minute)), nil
+		}), clock).Run(ctx, sink)
+	}()
+	_ = nextEvent(t, sink)
+	if got := waitForSourceWait(t, clock); got != 6*time.Minute+40*time.Second {
+		t.Fatalf("fallback wait = %v, want 6m40s", got)
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run() = %v, want cancellation", err)
 	}
 }
 
@@ -291,10 +637,11 @@ func TestBatterySysfsStates(t *testing.T) {
 }
 
 type fakeClock struct {
-	mu    sync.Mutex
-	now   time.Time
-	waits []time.Duration
-	wake  chan time.Time
+	mu     sync.Mutex
+	now    time.Time
+	waits  []time.Duration
+	waited chan struct{}
+	wake   chan time.Time
 }
 
 func (clock *fakeClock) Now() time.Time {
@@ -306,6 +653,12 @@ func (clock *fakeClock) After(duration time.Duration) <-chan time.Time {
 	clock.mu.Lock()
 	clock.waits = append(clock.waits, duration)
 	clock.mu.Unlock()
+	if clock.waited != nil {
+		select {
+		case clock.waited <- struct{}{}:
+		default:
+		}
+	}
 	return clock.wake
 }
 func (clock *fakeClock) setNow(now time.Time) {
