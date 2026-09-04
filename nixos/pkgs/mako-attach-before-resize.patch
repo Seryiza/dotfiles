@@ -1,0 +1,30 @@
+--- a/wayland.c
++++ b/wayland.c
+@@ -682,21 +682,12 @@
+ 		zwlr_layer_surface_v1_set_margin(surface->layer_surface,
+ 			style->outer_margin.top, style->outer_margin.right,
+ 			style->outer_margin.bottom, style->outer_margin.left);
+-		wl_surface_commit(surface->surface);
+-
+-		// Now we're going to bail without drawing anything. This gives the
+-		// compositor a chance to create the surface and tell us what size we
+-		// were actually granted, which may be smaller than what we asked for
+-		// depending on the screen size and layout of other layer surfaces.
+-		// This information is provided in layer_surface_handle_configure,
+-		// which will then call send_frame again. When that call happens, the
+-		// layer surface will exist and the height will hopefully match what
+-		// we asked for. That means we won't return here, and will actually
+-		// draw into the surface down below.
+-		// TODO: If the compositor doesn't send a configure with the size we
+-		// requested, we'll enter an infinite loop. We need to keep track of
+-		// the fact that a request was sent separately from what height we are.
+-		return;
++		if (!surface->configured) {
++			// A new layer surface must wait for its initial configure before
++			// attaching a buffer.
++			wl_surface_commit(surface->surface);
++			return;
++		}
+ 	}
+ 
+ 	assert(surface->configured);

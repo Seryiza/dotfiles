@@ -2,9 +2,9 @@
 let
   volumeSound = "${pkgs.yaru-theme}/share/sounds/Yaru/stereo/audio-volume-change.oga";
   patchedMako = pkgs.mako.overrideAttrs (oldAttrs: {
-    # Remove when https://github.com/emersion/mako/issues/655 is fixed upstream.
+    # Remove when https://github.com/emersion/mako/issues/636 is fixed upstream.
     patches = (oldAttrs.patches or [ ]) ++ [
-      ../pkgs/mako-retry-busy-buffer.patch
+      ../pkgs/mako-attach-before-resize.patch
     ];
   });
 in
