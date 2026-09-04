@@ -7,17 +7,20 @@
    '("a75fc55d480accd6f651d1bae492b7ab4c5b28894350b63ef39bf947bb8fd453"
      default))
  '(package-selected-packages
-   '(add-node-modules-path agent-shell all-the-icons cape cider consult
-                           corfu-terminal eat elfeed-org
-                           flycheck-clj-kondo howm inheritenv
-                           json-mode kind-icon magit markdown-mode
-                           meow modus-themes mu4e nix-mode orderless
-                           org-download org-repeat-by-cron projectile
-                           rg super-save telega tempel treesit-auto
-                           ultra-scroll verb vertico vice-mode vterm
-                           yaml-mode))
+   '(add-node-modules-path agent-shell agent-shell-sidebar all-the-icons
+                           cape cider consult corfu-terminal diff-hl
+                           eat elfeed-org flycheck-clj-kondo howm
+                           inheritenv json-mode kind-icon magit
+                           markdown-mode meow modus-themes mu4e
+                           nix-mode orderless org-download
+                           org-repeat-by-cron projectile rg super-save
+                           telega tempel treesit-auto ultra-scroll
+                           verb vertico vice-mode vterm yaml-mode))
  '(package-vc-selected-packages
-   '((claude-code :url "https://github.com/stevemolitor/claude-code.el"))))
+   '((agent-shell-sidebar :url
+                          "https://github.com/cmacrae/agent-shell-sidebar")
+     (claude-code :url
+                  "https://github.com/stevemolitor/claude-code.el"))))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

@@ -538,6 +538,24 @@ instead.  Return non-nil when Emacs handled the close request."
 (use-package agent-shell
   :ensure t)
 
+(use-package agent-shell-sidebar
+  :after agent-shell
+  :vc (:url "https://github.com/cmacrae/agent-shell-sidebar")
+
+  :custom
+  (agent-shell-sidebar-position 'right)
+  (agent-shell-sidebar-width "50%")
+
+  :bind
+  (("C-c a s" . agent-shell-sidebar-toggle)
+   ("C-c a f" . agent-shell-sidebar-toggle-focus)))
+
+(use-package diff-hl
+  :ensure t
+  :hook
+  ((prog-mode . diff-hl-mode)
+   (magit-post-refresh . diff-hl-magit-post-refresh)))
+
 (use-package projectile
   :ensure t
   :init
