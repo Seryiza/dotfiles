@@ -296,7 +296,7 @@ in {
   };
 
   services.activitywatch = {
-    enable = true;
+    enable = false;
     watchers = {
       aw-watcher-window-wayland = { package = pkgs.aw-watcher-window-wayland; };
     };
