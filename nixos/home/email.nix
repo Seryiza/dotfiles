@@ -33,23 +33,22 @@ in {
     (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if ${bins.pgrep} -f "mu server" >/dev/null 2>&1; then
         echo "runMuInit: mu server running; skipping init" >&2
-        exit 0
-      fi
+      else
+        MUHOME="${config.programs.mu.home}"
+        MU_ADDRS=$(( \
+          ${bins.mu} info store 2>/dev/null | \
+          ${bins.gawk} '/personal-address/{print $4}' | \
+          paste -sd ' ' \
+        ) || true)
+        missing=0
+        for addr in ${addressesShell}; do
+          echo "$MU_ADDRS" | ${bins.grep} -Fqx "$addr" || missing=1
+        done
 
-      MUHOME="${config.programs.mu.home}"
-      MU_ADDRS=$(( \
-        ${bins.mu} info store 2>/dev/null | \
-        ${bins.gawk} '/personal-address/{print $4}' | \
-        paste -sd ' ' \
-      ) || true)
-      missing=0
-      for addr in ${addressesShell}; do
-        echo "$MU_ADDRS" | ${bins.grep} -Fqx "$addr" || missing=1
-      done
-
-      if [[ ! -d "$MUHOME" || "$missing" -eq 1 ]]; then
-        run ${bins.mu} init --maildir=${maildir} --muhome "$MUHOME" \
-          ${myAddresses} $VERBOSE_ARG
+        if [[ ! -d "$MUHOME" || "$missing" -eq 1 ]]; then
+          run ${bins.mu} init --maildir=${maildir} --muhome "$MUHOME" \
+            ${myAddresses} $VERBOSE_ARG
+        fi
       fi
     '');
 
