@@ -276,8 +276,8 @@ data."
   (setq org-indent-indentation-per-level 2)
 
   (setopt org-capture-templates
-          '(("i" "inbox item" item (file+olp "inbox.org" "Inbox")
-             "%?\n%i")
+          '(("i" "inbox item" entry (file+olp "inbox.org" "Inbox")
+             "* %?\n%i")
 
             ("t" "TODOs")
             ("tt" "Personal" entry (file+olp "areas/personal.org" "Personal")
