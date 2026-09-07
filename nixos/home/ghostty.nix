@@ -10,7 +10,7 @@
       window-padding-balance = true;
       window-padding-color = "extend";
       resize-overlay = "never";
-      mouse-scroll-multiplier = "discrete:1";
+      mouse-scroll-multiplier = "discrete:0.75";
       quit-after-last-window-closed = false;
     };
   };
