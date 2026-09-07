@@ -242,7 +242,7 @@ data."
   ;; (setq org-element-use-cache nil)
 
   (setq org-todo-keywords
-        '((sequence "TODO(t)" "NEXT(n)" "STRT(s!)" "WAIT(w!)" "|" "DONE(d)" "CANX(c)")))
+        '((sequence "TODO(t)" "NEXT(n)" "STRT(s!)" "WAIT(w!)" "|" "DONE(d!)" "CANX(c!)")))
 
   (setq org-outline-path-complete-in-steps nil)
   (setq org-refile-use-outline-path 'full-file-path)

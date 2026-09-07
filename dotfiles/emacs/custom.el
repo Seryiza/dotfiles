@@ -12,7 +12,7 @@
                            eat elfeed-org flycheck-clj-kondo howm
                            inheritenv json-mode kind-icon magit
                            markdown-mode meow modus-themes mu4e
-                           nix-mode orderless org-download
+                           nix-mode orderless org-download org-edna
                            org-repeat-by-cron projectile rg super-save
                            telega tempel treesit-auto ultra-scroll
                            verb vertico vice-mode vterm yaml-mode))
