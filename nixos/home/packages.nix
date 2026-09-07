@@ -44,6 +44,7 @@ in
 
     llm-agents-pkgs.claude-code
     llm-agents-pkgs.claude-agent-acp
+    llm-agents-pkgs.opencode
     llm-agents-pkgs.codex
     llm-agents-pkgs.codex-acp
     llm-agents-pkgs.pi
