@@ -10,6 +10,8 @@
       window-padding-balance = true;
       window-padding-color = "extend";
       resize-overlay = "never";
+      mouse-scroll-multiplier = "discrete:1";
+      quit-after-last-window-closed = false;
     };
   };
 }
