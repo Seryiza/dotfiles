@@ -44,12 +44,10 @@ in
 
     llm-agents-pkgs.claude-code
     llm-agents-pkgs.claude-agent-acp
-    llm-agents-pkgs.opencode
     llm-agents-pkgs.codex
     llm-agents-pkgs.codex-acp
     llm-agents-pkgs.pi
     inputs.omp.packages.${system}.omp
-    llm-agents-pkgs.opencode
     llm-agents-pkgs.qmd
     llm-agents-pkgs.spec-kit
 

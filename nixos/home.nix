@@ -7,6 +7,7 @@ in {
     ./home/sway.nix
     ./home/mako.nix
     ./home/packages.nix
+    ./home/opencode.nix
     ./home/alacritty.nix
     ./home/ghostty.nix
     ./home/waybar.nix
