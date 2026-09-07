@@ -8,6 +8,7 @@ in {
     ./home/mako.nix
     ./home/packages.nix
     ./home/alacritty.nix
+    ./home/ghostty.nix
     ./home/waybar.nix
     ./home/zelbar.nix
     ./home/email.nix

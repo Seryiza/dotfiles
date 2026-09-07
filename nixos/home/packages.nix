@@ -165,7 +165,6 @@ in
     unstable-pkgs.ollama
     unstable-pkgs.llama-cpp
     pkgs.gnome-font-viewer
-    pkgs.ghostty
     pkgs.pnpm
     pkgs.epiphany
     pkgs.chez
