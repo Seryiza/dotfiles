@@ -21,6 +21,8 @@
 ;; Move through windows with Ctrl-<arrow keys>
 (windmove-default-keybindings 'control)
 
+(winner-mode 1)
+
 (setopt use-short-answers t)
 (setopt use-dialog-box nil)
 
