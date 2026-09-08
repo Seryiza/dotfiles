@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/MatthiasKunnen/go-wayland/cmd/go-wayland-scanner v0.0.0-20250821192337-412de804cb23
 	github.com/MatthiasKunnen/go-wayland/wayland v0.2.0
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/rivo/uniseg v0.4.7
 	golang.org/x/sys v0.37.0
 )

@@ -23,9 +23,7 @@ var (
 	zelbarDefault       string
 	machictlDefault     string
 	orgTimeblockDefault string
-	wireGuardDefault    string
 	wpctlDefault        string
-	nmcliDefault        string
 )
 
 func main() {
@@ -52,9 +50,7 @@ func run() error {
 		"--zelbar":               *zelbarPath,
 		"--machictl":             *machictlPath,
 		"packaged org-timeblock": orgTimeblockDefault,
-		"packaged wireguard":     wireGuardDefault,
 		"packaged wpctl":         wpctlDefault,
-		"packaged nmcli":         nmcliDefault,
 	}
 	for name, path := range paths {
 		if path == "" || !filepath.IsAbs(path) {
@@ -89,9 +85,9 @@ func run() error {
 		statussource.NewOrgTimeblock(statussource.Command{Path: orgTimeblockDefault, Args: []string{"--state"}}, runner, nil),
 		statussource.NewOrgClock(filepath.Join(runtimeDir, "river-zelbar-status-org-clock")),
 		statussource.NewAudio(statussource.Command{Path: wpctlDefault}, runner),
-		statussource.NewNetwork(statussource.Command{Path: nmcliDefault}, runner),
-		statussource.NewWireGuard(statussource.Command{Path: wireGuardDefault}, runner),
+		statussource.NewNetworkManager(),
 		statussource.NewBattery("/sys/class/power_supply"),
+		statussource.NewPowerSaver(),
 		statussource.NewClock(nil),
 	}
 	return engine.Run(ctx, sources, zelbar, statusfmt.Format)

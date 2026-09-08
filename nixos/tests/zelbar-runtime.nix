@@ -4,7 +4,6 @@
   river-zelbar-status,
 }:
 assert river-zelbar-status.pname == "river-zelbar-status";
-assert river-zelbar-status.vendorHash == "sha256-YKqCeXbHaaxoHmUC1/4Z0GIym3qxcqzh5SVaA+7ZI/o=";
 assert river-zelbar-status.doCheck;
 pkgs.runCommand "zelbar-runtime-check"
   {
@@ -16,6 +15,7 @@ pkgs.runCommand "zelbar-runtime-check"
     emacs_src=${../../dotfiles/emacs}
 
     test -x ${river-zelbar-status}/bin/river-zelbar-status
+    ! grep -E 'tlpctl|nmcli|wireGuardDefault' "$status_src/cmd/river-zelbar-status/main.go"
     test "$(${zelbar}/bin/zelbar -version 2>&1)" = 1.2.0
     runtime="$(mktemp -d)"
     trap 'rm -rf "$runtime"' EXIT

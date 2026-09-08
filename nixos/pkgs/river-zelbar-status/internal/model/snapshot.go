@@ -12,6 +12,7 @@ type Snapshot struct {
 	Network      string
 	WireGuard    string
 	Battery      string
+	PowerSaver   string
 	Clock        string
 }
 
@@ -38,6 +39,7 @@ const (
 	FieldNetwork
 	FieldWireGuard
 	FieldBattery
+	FieldPowerSaver
 	FieldClock
 )
 
@@ -88,6 +90,8 @@ func Reduce(previous Snapshot, update Update) Snapshot {
 		next.WireGuard = update.value
 	case FieldBattery:
 		next.Battery = update.value
+	case FieldPowerSaver:
+		next.PowerSaver = update.value
 	case FieldClock:
 		next.Clock = update.value
 	}

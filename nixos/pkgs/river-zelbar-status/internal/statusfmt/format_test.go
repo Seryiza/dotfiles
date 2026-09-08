@@ -47,13 +47,14 @@ func TestFormatPreservesCompleteTextSourceOrder(t *testing.T) {
 		WireGuard:    "wireguard",
 		XKB:          "xkb",
 		Battery:      "battery",
+		PowerSaver:   "POWER SAVER",
 		Clock:        "clock",
 	}
 	got, err := Format(snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "%{l}%{r}timeblock | org-clock | audio | network | wireguard | xkb | battery | clock \n"
+	want := "%{l}%{r}timeblock | org-clock | audio | network | wireguard | xkb | battery | POWER SAVER | clock \n"
 	if string(got) != want {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}

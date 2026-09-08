@@ -44,6 +44,7 @@ pkgs.runCommand "zelbar-session-check"
     grep -F 'exec ${river-zelbar-status}/bin/river-zelbar-status' "$launcher"
     grep -F -- '--zelbar ${zelbar}/bin/zelbar' "$launcher"
     grep -F -- '--machictl ${machi}/bin/machictl' "$launcher"
+    ! grep -F -- '--tlpctl' "$launcher"
 
     status_main=${river-zelbar-status.src}/cmd/river-zelbar-status/main.go
     grep -F 'const output = "eDP-1"' "$status_main"

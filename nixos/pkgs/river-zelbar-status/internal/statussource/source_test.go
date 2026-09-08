@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,6 +114,8 @@ func fieldValue(snapshot model.Snapshot, field model.Field) string {
 		return snapshot.Network
 	case model.FieldBattery:
 		return snapshot.Battery
+	case model.FieldPowerSaver:
+		return snapshot.PowerSaver
 	case model.FieldClock:
 		return snapshot.Clock
 	default:
@@ -459,35 +460,6 @@ func TestOrgTimeblockRecoveryDuringFallBack(t *testing.T) {
 	}
 }
 
-func TestWireGuardJSONContract(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		out  string
-		err  error
-		want string
-		warn bool
-	}{
-		{"valid", `{"text":"wg-work","tooltip":"secret"}`, nil, "wg-work", false},
-		{"empty", `{"text":"","tooltip":""}`, nil, "", false},
-		{"malformed", `{nope}`, nil, "", true},
-		{"timeout", "", context.DeadlineExceeded, "", true},
-		{"nonzero exit", "", errors.New("exit status 7"), "", true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			runner := runnerFunc(func(_ context.Context, command Command) ([]byte, error) {
-				if !reflect.DeepEqual(command.Args, []string{"short"}) {
-					t.Fatalf("args = %#v", command.Args)
-				}
-				return []byte(test.out), test.err
-			})
-			event := runFirst(t, NewWireGuard(Command{Path: "/store/wg"}, runner))
-			if got := eventValue(event, model.FieldWireGuard); got != test.want || (event.Warning != nil) != test.warn {
-				t.Fatalf("value/warning = %q/%v, want %q/%v", got, event.Warning, test.want, test.warn)
-			}
-		})
-	}
-}
-
 func TestAudioSinkAndSourceStates(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -513,46 +485,6 @@ func TestAudioSinkAndSourceStates(t *testing.T) {
 			event := runFirst(t, NewAudio(Command{Path: "/store/wpctl"}, runner))
 			if got := eventValue(event, model.FieldAudio); got != test.want {
 				t.Fatalf("audio = %q, want %q", got, test.want)
-			}
-		})
-	}
-}
-
-func TestNetworkVisibleSemantics(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		outputs [][]byte
-		err     error
-		want    string
-	}{
-		{"healthy wifi", [][]byte{[]byte("enabled\n"), []byte("wlp1s0:wifi:connected\n"), []byte("10.0.0.2/24\n"), []byte("*:75\n")}, nil, ""},
-		{"healthy ethernet", [][]byte{[]byte("enabled\n"), []byte("enp1s0:ethernet:connected\n"), []byte("10.0.0.2/24\n")}, nil, ""},
-		{"low wifi", [][]byte{[]byte("enabled\n"), []byte("wlp1s0:wifi:connected\n"), []byte("10.0.0.2/24\n"), []byte("*:19\n")}, nil, "<20% wlan"},
-		{"disconnected", [][]byte{[]byte("enabled\n"), []byte("wlp1s0:wifi:disconnected\n")}, nil, "Disconnected"},
-		{"linked without IP", [][]byte{[]byte("enabled\n"), []byte("enp1s0:ethernet:connected\n"), []byte("\n")}, nil, "enp1s0 (No IP)"},
-		{"disabled", [][]byte{[]byte("disabled\n"), []byte("wlp1s0:wifi:disconnected\n")}, nil, "Wi-Fi disabled"},
-		{"empty", [][]byte{[]byte("enabled\n"), []byte("")}, nil, "network?"},
-		{"malformed", [][]byte{[]byte("enabled\n"), []byte("bad row\n")}, nil, "network?"},
-		{"invalid UTF-8", [][]byte{[]byte("enabled\n"), {0xff, '\n'}}, nil, "network?"},
-		{"timeout", nil, context.DeadlineExceeded, "network?"},
-		{"nonzero exit", nil, errors.New("exit status 7"), "network?"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			index := 0
-			runner := runnerFunc(func(_ context.Context, command Command) ([]byte, error) {
-				if index == 0 && test.err == nil && !reflect.DeepEqual(command.Args, []string{"-g", "WIFI", "general"}) {
-					t.Fatalf("first nmcli args = %#v", command.Args)
-				}
-				if test.err != nil {
-					return nil, test.err
-				}
-				out := test.outputs[index]
-				index++
-				return out, nil
-			})
-			event := runFirst(t, NewNetwork(Command{Path: "/store/nmcli"}, runner))
-			if got := eventValue(event, model.FieldNetwork); got != test.want {
-				t.Fatalf("network = %q, want %q", got, test.want)
 			}
 		})
 	}

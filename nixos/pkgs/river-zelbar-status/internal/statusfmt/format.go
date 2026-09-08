@@ -75,7 +75,7 @@ func Format(snapshot model.Snapshot) ([]byte, error) {
 
 func formattedParts(snapshot model.Snapshot) ([]string, []string, error) {
 	left := make([]string, 0, 1)
-	right := make([]string, 0, 10)
+	right := make([]string, 0, 11)
 	if snapshot.Machi.Valid {
 		title, err := Sanitize(snapshot.Machi.Title, 2048)
 		if err != nil {
@@ -102,6 +102,7 @@ func formattedParts(snapshot model.Snapshot) ([]string, []string, error) {
 		{"WireGuard", snapshot.WireGuard, 256},
 		{"XKB", snapshot.XKB, 64},
 		{"battery", snapshot.Battery, 64},
+		{"power saver", snapshot.PowerSaver, 64},
 		{"clock", snapshot.Clock, 64},
 	}
 	for _, field := range rightValues {
