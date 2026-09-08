@@ -79,6 +79,25 @@ in {
   hardware.enableRedistributableFirmware = true;
   services.fwupd.enable = true;
 
+  services.power-profiles-daemon.enable = false;
+  services.tlp = {
+    enable = true;
+    pd.enable = true;
+    settings = {
+      # Manual selection survives charger changes and resume; boot starts balanced.
+      TLP_AUTO_SWITCH = 0;
+      TLP_DEFAULT_MODE = "BAL";
+      PLATFORM_PROFILE_ON_AC = "balanced";
+      PLATFORM_PROFILE_ON_BAT = "balanced";
+      PLATFORM_PROFILE_ON_SAV = "quiet";
+      CPU_ENERGY_PERF_POLICY_ON_AC = "balance_performance";
+      CPU_ENERGY_PERF_POLICY_ON_BAT = "balance_power";
+      CPU_ENERGY_PERF_POLICY_ON_SAV = "power";
+      # Preserve NVIDIA's already-working runtime power management.
+      "RUNTIME_PM_DRIVER_DENYLIST+" = "nvidia";
+    };
+  };
+
   systemd.tmpfiles.rules =
     [ "L+    /opt/rocm   -    -    -     -    ${rocmEnv}" ];
 

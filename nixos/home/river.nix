@@ -40,6 +40,20 @@ in
   homeManagerModule =
     { config, pkgs, ... }:
     let
+      powerSaver = pkgs.writeShellApplication {
+        name = "river-power-saver";
+        text = ''
+          ${pkgs.tlp-pd}/bin/tlpctl power-saver
+          ${pkgs.wlr-randr}/bin/wlr-randr --output eDP-1 --mode 2560x1600@60Hz
+        '';
+      };
+      powerBalanced = pkgs.writeShellApplication {
+        name = "river-power-balanced";
+        text = ''
+          ${pkgs.tlp-pd}/bin/tlpctl balanced
+          ${pkgs.wlr-randr}/bin/wlr-randr --output eDP-1 --mode 2560x1600@240Hz
+        '';
+      };
       enpassX11 = pkgs.writeShellScript "run-enpass-x11" ''
         exec env QT_QPA_PLATFORM=xcb Enpass
       '';
@@ -51,6 +65,8 @@ in
           "@swaylock@"
           "@uwsm@"
           "@wmenu@"
+          "@powerSaver@"
+          "@powerBalanced@"
         ]
         [
           config.home.pointerCursor.name
@@ -59,11 +75,15 @@ in
           (toString pkgs.swaylock)
           (toString pkgs.uwsm)
           (toString pkgs.wmenu)
+          (toString powerSaver)
+          (toString powerBalanced)
         ]
         (builtins.readFile ../../dotfiles/machi.ini);
     in
     {
       home.packages = [
+        powerSaver
+        powerBalanced
         pkgs.machi
         pkgs.channel
         pkgs.wlr-randr

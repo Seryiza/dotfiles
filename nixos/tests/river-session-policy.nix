@@ -61,7 +61,7 @@ pkgs.runCommand "river-session-policy-check"
     grep -F 'toggle-fullscreen=super+f' "$machi_config"
     grep -F 'toggle-split-view=super+s' "$machi_config"
     grep -F 'ghostty +new-window=super+y' "$machi_config"
-    grep -Fx 'mouse-scroll-multiplier = discrete:1' "$home_files/.config/ghostty/config"
+    grep -Fx 'mouse-scroll-multiplier = discrete:0.75' "$home_files/.config/ghostty/config"
     grep -Fx 'quit-after-last-window-closed = false' "$home_files/.config/ghostty/config"
     test -f "$home_files/.config/systemd/user/app-com.mitchellh.ghostty.service"
     grep -F 'swaylock -c 000000=super+escape' "$machi_config"
@@ -70,6 +70,18 @@ pkgs.runCommand "river-session-policy-check"
     grep -F 'firefox=super+b' "$machi_config"
     grep -F 'run-work-browser=super+shift+b' "$machi_config"
     grep -F 'run-enpass-x11=super+e' "$machi_config"
+    grep -F '/bin/river-power-saver=super+F8' "$machi_config"
+    grep -F '/bin/river-power-balanced=super+shift+F8' "$machi_config"
+    saver=$(sed -n 's|=super+F8$||p' "$machi_config")
+    balanced=$(sed -n 's|=super+shift+F8$||p' "$machi_config")
+    grep -F 'tlpctl power-saver' "$saver"
+    grep -F -- '--output eDP-1 --mode 2560x1600@60Hz' "$saver"
+    grep -F 'tlpctl balanced' "$balanced"
+    grep -F -- '--output eDP-1 --mode 2560x1600@240Hz' "$balanced"
+    grep -Fx 'TLP_AUTO_SWITCH=0' ${toplevel}/etc/tlp.conf
+    grep -Fx 'TLP_DEFAULT_MODE=BAL' ${toplevel}/etc/tlp.conf
+    grep -Fx 'PLATFORM_PROFILE_ON_SAV=quiet' ${toplevel}/etc/tlp.conf
+    grep -Fx 'RUNTIME_PM_DRIVER_DENYLIST+=nvidia' ${toplevel}/etc/tlp.conf
     grep -F 'grim -g "$(slurp)" - | wl-copy=print' "$machi_config"
     grep -F 'grim -g "$(slurp)"=ctrl+print' "$machi_config"
     grep -F 'grim - | wl-copy | drawing -c=shift+print' "$machi_config"
