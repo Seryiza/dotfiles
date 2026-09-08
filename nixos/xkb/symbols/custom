@@ -1,5 +1,9 @@
 partial alphanumeric_keys
 xkb_symbols "positional_latin_shortcuts" {
+    key <TLDE> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_io, Cyrillic_IO, grave ]
+    };
     key <AD01> {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
         symbols = [ Cyrillic_shorti, Cyrillic_SHORTI, q ]
@@ -40,6 +44,14 @@ xkb_symbols "positional_latin_shortcuts" {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
         symbols = [ Cyrillic_ze, Cyrillic_ZE, p ]
     };
+    key <AD11> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_ha, Cyrillic_HA, bracketleft ]
+    };
+    key <AD12> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_hardsign, Cyrillic_HARDSIGN, bracketright ]
+    };
 
     key <AC01> {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
@@ -77,6 +89,14 @@ xkb_symbols "positional_latin_shortcuts" {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
         symbols = [ Cyrillic_de, Cyrillic_DE, l ]
     };
+    key <AC10> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_zhe, Cyrillic_ZHE, semicolon ]
+    };
+    key <AC11> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_e, Cyrillic_E, apostrophe ]
+    };
 
     key <AB01> {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
@@ -105,5 +125,13 @@ xkb_symbols "positional_latin_shortcuts" {
     key <AB07> {
         type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
         symbols = [ Cyrillic_softsign, Cyrillic_SOFTSIGN, m ]
+    };
+    key <AB08> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_be, Cyrillic_BE, comma ]
+    };
+    key <AB09> {
+        type[Group1] = "POSITIONAL_LATIN_SHORTCUT",
+        symbols = [ Cyrillic_yu, Cyrillic_YU, period ]
     };
 };

@@ -12,6 +12,13 @@ struct letter {
 };
 
 static const struct letter letters[] = {
+    {"AB08", "Cyrillic_be", "Cyrillic_BE", "comma"},
+    {"AB09", "Cyrillic_yu", "Cyrillic_YU", "period"},
+    {"TLDE", "Cyrillic_io", "Cyrillic_IO", "grave"},
+    {"AD11", "Cyrillic_ha", "Cyrillic_HA", "bracketleft"},
+    {"AD12", "Cyrillic_hardsign", "Cyrillic_HARDSIGN", "bracketright"},
+    {"AC10", "Cyrillic_zhe", "Cyrillic_ZHE", "semicolon"},
+    {"AC11", "Cyrillic_e", "Cyrillic_E", "apostrophe"},
     {"AD01", "Cyrillic_shorti", "Cyrillic_SHORTI", "q"},
     {"AD02", "Cyrillic_tse", "Cyrillic_TSE", "w"},
     {"AD03", "Cyrillic_u", "Cyrillic_U", "e"},
@@ -161,13 +168,13 @@ int main(void)
         const struct letter *letter = &letters[i];
         expect_symbol(state, keymap, letter, 0, 0, letter->cyrillic_lower);
         expect_symbol(state, keymap, letter, shift, 0, letter->cyrillic_upper);
+        expect_symbol(state, keymap, letter, super, super, letter->latin);
         expect_symbol(state, keymap, letter, control, control, letter->latin);
         expect_symbol(state, keymap, letter, shift | control,
                       shift | control, letter->latin);
         expect_symbol(state, keymap, letter, alt, alt, letter->latin);
         expect_symbol(state, keymap, letter, shift | alt,
                       shift | alt, letter->latin);
-        expect_symbol(state, keymap, letter, super, super, letter->latin);
         expect_symbol(state, keymap, letter, shift | super,
                       shift | super, letter->latin);
         expect_symbol(state, keymap, letter, shortcut, shortcut, letter->latin);

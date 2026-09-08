@@ -119,7 +119,7 @@ pkgs.runCommand "river-session-policy-check"
     grep -F 'custom:positional-latin-shortcuts' "$xkb_root/rules/evdev"
     grep -F 'type "POSITIONAL_LATIN_SHORTCUT"' "$xkb_root/types/custom"
     ! grep -E 'Mod5|LevelThree' "$xkb_root/types/custom"
-    test "$(grep -c 'type\[Group1\] = "POSITIONAL_LATIN_SHORTCUT"' "$xkb_root/symbols/custom")" -eq 26
+    test "$(grep -c 'type\[Group1\] = "POSITIONAL_LATIN_SHORTCUT"' "$xkb_root/symbols/custom")" -eq 33
 
     ${pkgs.libxkbcommon}/bin/xkbcli compile-keymap \
       --include "$xkb_root" \
