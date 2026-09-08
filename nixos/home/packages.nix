@@ -66,6 +66,7 @@ in
     unstable-pkgs.enpass
     pkgs.postgresql_17
     pkgs.onlyoffice-desktopeditors
+    pkgs.libreoffice
     pkgs.gh
     pkgs.evince
     pkgs.inkscape
