@@ -69,6 +69,7 @@
     in
     {
       packages.${system} = {
+        donsetch = packages.callPackage ./nixos/pkgs/donsetch.nix { };
         inherit (packages) river machi channel zelbar river-zelbar-status;
       };
 

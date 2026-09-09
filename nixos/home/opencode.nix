@@ -1,10 +1,20 @@
 { pkgs, llm-agents, ... }:
+let
+  donsetch = pkgs.callPackage ../pkgs/donsetch.nix { };
+in
 {
+  home.packages = [ donsetch ];
+
   programs.opencode = {
     enable = true;
     package = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
 
     settings = {
+      mcp.donsetch = {
+        type = "local";
+        command = [ "${donsetch}/bin/donsetch" "mcp" "--supervised" ];
+        enabled = true;
+      };
       permission = "allow";
       plugin = [
         "@dietrichgebert/ponytail"
