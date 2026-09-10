@@ -172,5 +172,6 @@ in
     pkgs.insomnia
     pkgs.baobab
     pkgs.uv
+    pkgs.tigervnc
   ];
 }
