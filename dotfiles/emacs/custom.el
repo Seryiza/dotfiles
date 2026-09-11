@@ -10,14 +10,17 @@
    '(add-node-modules-path agent-shell agent-shell-sidebar all-the-icons
                            cape cider consult corfu-terminal diff-hl
                            eat elfeed-org flycheck-clj-kondo howm
-                           inheritenv json-mode kind-icon magit
-                           markdown-mode meow modus-themes mu4e
+                           inheritenv iscroll json-mode kind-icon
+                           magit markdown-mode meow modus-themes mu4e
                            nix-mode orderless org-download org-edna
-                           org-repeat-by-cron projectile rg super-save
-                           telega tempel treesit-auto ultra-scroll
-                           verb vertico vice-mode vterm yaml-mode))
+                           org-limit-image-size org-repeat-by-cron
+                           projectile rg super-save telega tempel
+                           treesit-auto ultra-scroll verb vertico
+                           vice-mode vterm yaml-mode))
  '(package-vc-selected-packages
-   '((agent-shell-sidebar :url
+   '((org-limit-image-size :url
+                           "https://github.com/misohena/org-inline-image-fix")
+     (agent-shell-sidebar :url
                           "https://github.com/cmacrae/agent-shell-sidebar")
      (claude-code :url
                   "https://github.com/stevemolitor/claude-code.el"))))

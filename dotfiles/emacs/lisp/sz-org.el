@@ -258,7 +258,6 @@ data."
   (setq org-log-repeat 'time)
   (setq org-log-done 'time)
 
-  (setq org-image-actual-width 400)
   (setq org-startup-with-inline-images t)
   (setq org-yank-image-save-method (expand-file-name "images/" org-directory))
   (setq org-tags-column 40)
@@ -459,5 +458,16 @@ ARG is passed to `org-agenda-redo-all'."
 
   :config
   (setq-default org-download-image-dir "~/org/images"))
+
+(use-package org-limit-image-size
+  :after org
+  :vc (:url "https://github.com/misohena/org-inline-image-fix"
+       :rev :newest)
+
+  :custom
+  (org-limit-image-size '(0.9 . 0.45))
+
+  :config
+  (org-limit-image-size-activate))
 
 (provide 'sz-org)
