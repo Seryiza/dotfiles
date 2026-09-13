@@ -4,19 +4,27 @@ let
 in
 {
   home.packages = [ donsetch ];
+  home.sessionVariables.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS = "true";
 
   programs.opencode = {
     enable = true;
     package = llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode;
 
     settings = {
+      "$schema" = "https://opencode.ai/config.json";
+      default_agent = "orchestrator";
       mcp.donsetch = {
         type = "local";
-        command = [ "${donsetch}/bin/donsetch" "mcp" "--supervised" ];
+        command = [
+          "${donsetch}/bin/donsetch"
+          "mcp"
+          "--supervised"
+        ];
         enabled = true;
       };
       permission = "allow";
       plugin = [
+        "oh-my-opencode-slim@2.2.19"
         "@dietrichgebert/ponytail"
         "opencode-command-inject@latest"
       ];
@@ -27,7 +35,7 @@ in
           reasoningEffort = "high";
         };
         build = {
-          model = "openai/gpt-5.6-terra";
+          model = "openai/gpt-6-astra";
           textVerbosity = "low";
           reasoningEffort = "medium";
         };
@@ -63,4 +71,55 @@ in
 
   # Manage the existing path so a leftover JSONC config cannot override Nix settings.
   xdg.configFile."opencode/opencode.json".target = "opencode/opencode.jsonc";
+
+  xdg.configFile."opencode/oh-my-opencode-slim.jsonc".text = builtins.toJSON {
+    "$schema" = "https://unpkg.com/oh-my-opencode-slim@2.2.19/oh-my-opencode-slim.schema.json";
+    autoUpdate = false;
+    preset = "openai";
+    disabled_agents = [
+      "observer"
+      "council"
+    ];
+    presets.openai = {
+      orchestrator = {
+        model = "openai/gpt-6-astra";
+        variant = "high";
+        options.textVerbosity = "low";
+        skills = [
+          "*"
+          "!deepwork"
+        ];
+        mcps = [ "donsetch" ];
+      };
+      oracle = {
+        model = "openai/gpt-6-astra";
+        variant = "high";
+        mcps = [ ];
+      };
+      fixer = {
+        model = "openai/gpt-5.6-sol";
+        variant = "high";
+        mcps = [ ];
+      };
+      designer = {
+        model = "openai/gpt-5.6-sol";
+        variant = "medium";
+        mcps = [ ];
+      };
+      explorer = {
+        model = "openai/gpt-5.6-terra";
+        variant = "medium";
+        mcps = [ ];
+      };
+      librarian = {
+        model = "openai/gpt-5.6-terra";
+        variant = "medium";
+        mcps = [
+          "donsetch"
+          "context7"
+          "gh_grep"
+        ];
+      };
+    };
+  };
 }
