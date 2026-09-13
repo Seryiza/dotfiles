@@ -4,6 +4,7 @@
 /.rpiv
 /.agent-shell
 /.dirge
+/.scratch
 
 /.vagrant
 /*.log
