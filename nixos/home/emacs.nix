@@ -1,6 +1,9 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
+  home.file.".emacs.d".source = config.lib.file.mkOutOfStoreSymlink
+    "${config.home.homeDirectory}/code/my-dev-env/dotfiles/emacs";
+
   programs.emacs = {
     enable = true;
     package = pkgs.emacs-pgtk;

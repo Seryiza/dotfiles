@@ -215,6 +215,15 @@ data."
 (use-package org
   :ensure t
   :pin gnu
+  :catch nil
+
+  :init
+  (setq org-id-locations-file (expand-file-name ".org-id-locations" sz/state-directory)
+        org-clock-persist-file (expand-file-name "org-clock-save.el" sz/state-directory)
+        org-persist-directory (expand-file-name "org-persist/" sz/cache-directory))
+  (sz/state-prepare-paths
+   (list org-persist-directory)
+   (list org-id-locations-file org-clock-persist-file))
 
   :hook
   ((org-mode . visual-line-mode)

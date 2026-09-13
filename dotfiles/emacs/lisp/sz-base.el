@@ -1,5 +1,113 @@
 ;; === Base options
 
+(use-package emacs
+  :ensure nil
+  :catch nil
+  :init
+  (setq sz/backup-directory (expand-file-name "backups/" sz/state-directory)
+        sz/auto-save-directory (expand-file-name "auto-save-list/" sz/state-directory))
+  (sz/state-prepare-paths
+   (list sz/backup-directory sz/auto-save-directory) nil)
+  (setq backup-directory-alist `(("." . ,sz/backup-directory))
+        auto-save-file-name-transforms `((".*" ,sz/auto-save-directory t))
+        auto-save-list-file-prefix (expand-file-name ".saves-" sz/auto-save-directory)
+        backup-by-copying t
+        delete-old-versions t
+        kept-new-versions 6
+        kept-old-versions 2
+        version-control t))
+
+(use-package recentf
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq recentf-save-file (expand-file-name "recentf" sz/state-directory))
+  (sz/state-prepare-paths nil (list recentf-save-file)))
+
+(use-package bookmark
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq bookmark-default-file (expand-file-name "bookmarks" sz/state-directory))
+  (sz/state-prepare-paths nil (list bookmark-default-file)))
+
+(use-package tramp
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq tramp-persistency-file-name (expand-file-name "tramp" sz/state-directory))
+  (sz/state-prepare-paths nil (list tramp-persistency-file-name)))
+
+(use-package transient
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq transient-levels-file (expand-file-name "transient/levels.el" sz/state-directory)
+        transient-values-file (expand-file-name "transient/values.el" sz/state-directory)
+        transient-history-file (expand-file-name "transient/history.el" sz/state-directory))
+  (sz/state-prepare-paths
+   (list (expand-file-name "transient/" sz/state-directory))
+   (list transient-levels-file transient-values-file transient-history-file)))
+
+(use-package url
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq url-configuration-directory (expand-file-name "url/" sz/state-directory)
+        url-cookie-file (expand-file-name "url/cookies" sz/state-directory)
+        url-history-file (expand-file-name "url/history" sz/state-directory)
+        url-cache-directory (expand-file-name "url/" sz/cache-directory))
+  (sz/state-prepare-paths
+   (list url-configuration-directory url-cache-directory)
+   (list url-cookie-file url-history-file)))
+
+(use-package svg-lib
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq svg-lib-icons-dir (expand-file-name "svg-lib/" sz/cache-directory))
+  (sz/state-prepare-paths (list svg-lib-icons-dir) nil))
+
+(use-package treesit
+  :ensure nil
+  :catch nil
+  :defer t
+  :init
+  (setq sz/tree-sitter-directory (expand-file-name "tree-sitter/" sz/cache-directory))
+  (sz/state-prepare-paths (list sz/tree-sitter-directory) nil)
+  (add-to-list 'treesit-extra-load-path sz/tree-sitter-directory)
+
+  (defun sz/state--treesit-install-language-grammar (function lang &optional out-dir)
+    "Call FUNCTION for LANG with XDG defaults while preserving explicit OUT-DIR."
+    (cond
+     ((eq out-dir 'interactive)
+      (let (updated-history result)
+        (let ((treesit--install-language-grammar-out-dir-history
+               (cons sz/tree-sitter-directory
+                     (delete sz/tree-sitter-directory
+                             (copy-sequence
+                              treesit--install-language-grammar-out-dir-history)))))
+          (setq result (funcall function lang out-dir)
+                updated-history treesit--install-language-grammar-out-dir-history))
+        (setq treesit--install-language-grammar-out-dir-history updated-history)
+        result))
+     ((null out-dir)
+      (funcall function lang sz/tree-sitter-directory))
+     (t
+      (funcall function lang out-dir))))
+
+  (with-eval-after-load 'treesit
+    (unless (advice-member-p #'sz/state--treesit-install-language-grammar
+                             'treesit-install-language-grammar)
+      (advice-add 'treesit-install-language-grammar :around
+                  #'sz/state--treesit-install-language-grammar))))
+
 (require 'sz-alerts)
 (require 'seq)
 
@@ -16,7 +124,14 @@
 (setopt auto-revert-verbose nil)
 (global-auto-revert-mode)
 
-(savehist-mode)
+(use-package savehist
+  :ensure nil
+  :catch nil
+  :init
+  (setq savehist-file (expand-file-name "history" sz/state-directory))
+  (sz/state-prepare-paths nil (list savehist-file))
+  :config
+  (savehist-mode 1))
 
 ;; Move through windows with Ctrl-<arrow keys>
 (windmove-default-keybindings 'control)
@@ -34,22 +149,6 @@
 
 (setopt make-backup-files t)
 (setopt create-lockfiles nil)
-
-(let* ((state-root (or (getenv "XDG_STATE_HOME")
-                       (expand-file-name "~/.local/state/")))
-       (emacs-state-dir (expand-file-name "emacs/" state-root))
-       (backup-dir (expand-file-name "backups/" emacs-state-dir))
-       (auto-save-dir (expand-file-name "auto-save-list/" emacs-state-dir)))
-  (make-directory backup-dir t)
-  (make-directory auto-save-dir t)
-  (setq backup-directory-alist `(("." . ,backup-dir))
-        auto-save-file-name-transforms `((".*" ,auto-save-dir t))
-        auto-save-list-file-prefix (expand-file-name ".saves-" auto-save-dir)
-        backup-by-copying t
-        delete-old-versions t
-        kept-new-versions 6
-        kept-old-versions 2
-        version-control t))
 
 (use-package which-key
   :ensure t
@@ -312,7 +411,11 @@ instead.  Return non-nil when Emacs handled the close request."
   :config (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
 
 (use-package eshell
+  :ensure nil
+  :catch nil
   :init
+  (setq eshell-directory-name (expand-file-name "eshell/" sz/state-directory))
+  (sz/state-prepare-paths (list eshell-directory-name) nil)
   (defun bedrock/setup-eshell ()
     ;; Something funny is going on with how Eshell sets up its keymaps; this is
     ;; a work-around to make C-r bound in the keymap
@@ -381,6 +484,11 @@ instead.  Return non-nil when Emacs handled the close request."
           (python-mode . python-ts-mode))))
 
 (use-package project
+  :ensure nil
+  :catch nil
+  :init
+  (setq project-list-file (expand-file-name "projects" sz/state-directory))
+  (sz/state-prepare-paths nil (list project-list-file))
   :custom (when (>= emacs-major-version 30)
             (project-mode-line t)))
 
@@ -480,6 +588,10 @@ instead.  Return non-nil when Emacs handled the close request."
 
 (use-package elfeed
   :ensure t
+  :catch nil
+  :init
+  (setq elfeed-db-directory (expand-file-name "elfeed/" sz/data-directory))
+  (sz/state-prepare-paths (list elfeed-db-directory) nil)
   :config
   (defun sz/elfeed-mark-auto-read-tags-read (entry)
     "Mark ENTRY as read when it has the `hide' tag."
@@ -531,7 +643,12 @@ instead.  Return non-nil when Emacs handled the close request."
           ("M-l" . windmove-right)))
 
 (use-package agent-shell
-  :ensure t)
+  :ensure t
+  :catch nil
+  :init
+  (setq shell-maker-root-path sz/state-directory)
+  (sz/state-prepare-paths
+   (list (expand-file-name "agent/" sz/state-directory)) nil))
 
 (use-package agent-shell-sidebar
   :after agent-shell
@@ -553,7 +670,17 @@ instead.  Return non-nil when Emacs handled the close request."
 
 (use-package projectile
   :ensure t
+  :catch nil
   :init
+  (setq projectile-known-projects-file
+        (expand-file-name "projectile-bookmarks.eld" sz/state-directory)
+        projectile-frecency-file
+        (expand-file-name "projectile-frecency.eld" sz/state-directory)
+        projectile-session-directory
+        (expand-file-name "projectile-sessions/" sz/state-directory))
+  (sz/state-prepare-paths
+   (list projectile-session-directory)
+   (list projectile-known-projects-file projectile-frecency-file))
   (projectile-mode +1)
 
   :bind

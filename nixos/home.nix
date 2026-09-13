@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ pkgs, ... }:
 let
   chromeExecutable = pkgs.lib.getExe' pkgs.google-chrome "google-chrome-stable";
 in {
@@ -101,9 +101,6 @@ in {
   };
 
   home.file = {
-    ".emacs.d".source = config.lib.file.mkOutOfStoreSymlink
-      "${config.home.homeDirectory}/code/my-dev-env/dotfiles/emacs";
-
     ".local/bin/waybar-org-timeblock" = {
       source = ../scripts/waybar-org-timeblock;
       executable = true;

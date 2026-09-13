@@ -1,3 +1,14 @@
+(custom-set-variables
+ '(custom-safe-themes
+   '("a75fc55d480accd6f651d1bae492b7ab4c5b28894350b63ef39bf947bb8fd453"
+     default)))
+
+(custom-set-faces
+ '(howm-mode-title-face ((t (:inherit unspecified :foreground unspecified :background unspecified))))
+ '(tab-bar ((t (:height 1.0))))
+ '(tab-bar-tab ((t (:box (:line-width (6 . 2) :color "#ffffff" :style nil)))))
+ '(tab-bar-tab-inactive ((t (:box (:line-width (6 . 2) :color "#c2c2c2" :style nil))))))
+
 (use-package modus-themes
   :ensure t
   :pin gnu

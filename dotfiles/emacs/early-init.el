@@ -1,3 +1,7 @@
+(setq package-enable-at-startup nil)
+
+(load (expand-file-name "lisp/sz-state.el" user-emacs-directory) nil 'nomessage t)
+
 ;; Startup speed, annoyance suppression
 (defvar sz/gc-cons-threshold-default 800000)
 (defvar sz/gc-cons-percentage-default 0.1)
@@ -8,7 +12,6 @@
             (setq gc-cons-threshold sz/gc-cons-threshold-default)
             (setq gc-cons-percentage sz/gc-cons-percentage-default)))
 
-(setq package-enable-at-startup nil)
 (setq package-quickstart t)
 
 (setq byte-compile-warnings '(not obsolete))
