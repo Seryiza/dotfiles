@@ -478,13 +478,6 @@ instead.  Return non-nil when Emacs handled the close request."
 (use-package inheritenv
   :vc (:url "https://github.com/purcell/inheritenv" :rev :newest))
 
-;; (use-package claude-code
-;;   :ensure t
-;;   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-;;   :config (claude-code-mode)
-;;   :bind-keymap ("C-c c" . claude-code-command-map)
-;;   :bind (:repeat-map sz/claude-code-map ("M" . claude-code-cycle-mode)))
-
 (use-package elfeed
   :ensure t
   :config
@@ -617,47 +610,6 @@ instead.  Return non-nil when Emacs handled the close request."
   :commands (vterm vterm-other-window)
   :config
   (add-to-list 'vterm-keymap-exceptions "C-;"))
-
-;; (use-package activities
-;;   :ensure t
-;;   :init
-;;   (activities-mode)
-;;   (activities-tabs-mode)
-;;   (setq edebug-inhibit-emacs-lisp-mode-bindings t)
-
-;;   :bind
-;;   (("C-x C-a C-n" . activities-new)
-;;    ("C-x C-a C-d" . activities-define)
-;;    ("C-x C-a C-a" . activities-resume)
-;;    ("C-x C-a C-s" . activities-suspend)
-;;    ("C-x C-a C-k" . activities-kill)
-;;    ("C-x C-a RET" . activities-switch)
-;;    ("C-x C-a b" . activities-switch-buffer)
-;;    ("C-x C-a g" . activities-revert)
-;;    ("C-x C-a l" . activities-list)))
-
-;; (use-package vtab
-;;   :ensure nil
-;;   :load-path "~/code/vtab"
-;;   :demand t
-
-;;   :bind*
-;;   (("M-j" . sz/below-or-tab-next)
-;;    ("M-k" . sz/above-or-tab-previous)
-;;    ("M-n" . tab-new)
-;;    ("M-u" . tab-close))
-
-;;   :custom
-;;   ;; Keep Emacs' horizontal tab bar hidden after commands like `tab-new'.
-;;   (tab-bar-show nil)
-;;   (vtab-window-width 30)
-;;   (vtab-hide-cursor t)
-;;   (vtab-hide-mode-line nil)
-;;   (vtab-hide-scroll-bars nil)
-;;   (vtab-active-fill-width t)
-
-;;   :config
-;;   (vtab-mode 1))
 
 (use-package emacs
   :ensure nil

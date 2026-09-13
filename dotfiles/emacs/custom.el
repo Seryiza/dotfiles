@@ -10,20 +10,18 @@
    '(add-node-modules-path agent-shell agent-shell-sidebar all-the-icons
                            cape cider consult corfu-terminal diff-hl
                            eat elfeed-org flycheck-clj-kondo howm
-                           inheritenv iscroll json-mode kind-icon
+                           inheritenv json-mode kind-icon
                            magit markdown-mode meow modus-themes mu4e
-                           nix-mode orderless org-download org-edna
+                           nix-mode orderless org-download
                            org-limit-image-size org-repeat-by-cron
                            projectile rg super-save telega tempel
-                           treesit-auto ultra-scroll verb vertico
-                           vice-mode vterm yaml-mode))
+                           treesit-auto verb vertico
+                           vterm yaml-mode))
  '(package-vc-selected-packages
    '((org-limit-image-size :url
                            "https://github.com/misohena/org-inline-image-fix")
      (agent-shell-sidebar :url
-                          "https://github.com/cmacrae/agent-shell-sidebar")
-     (claude-code :url
-                  "https://github.com/stevemolitor/claude-code.el"))))
+                          "https://github.com/cmacrae/agent-shell-sidebar"))))
 
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
@@ -33,6 +31,4 @@
  '(howm-mode-title-face ((t (:inherit unspecified :foreground unspecified :background unspecified))))
  '(tab-bar ((t (:height 1.0))))
  '(tab-bar-tab ((t (:box (:line-width (6 . 2) :color "#ffffff" :style nil)))))
- '(tab-bar-tab-inactive ((t (:box (:line-width (6 . 2) :color "#c2c2c2" :style nil)))))
- '(vtab-active-face ((t (:background "black" :foreground "white"))))
- '(vtab-active-line ((t (:background "black" :foreground "white")))))
+ '(tab-bar-tab-inactive ((t (:box (:line-width (6 . 2) :color "#c2c2c2" :style nil))))))

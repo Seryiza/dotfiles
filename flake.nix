@@ -15,16 +15,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    emacs-overlay = { url = "github:nix-community/emacs-overlay"; };
-
     emacs-lsp-booster.url = "github:slotThe/emacs-lsp-booster-flake";
 
     xremap = { url = "github:xremap/nix-flake"; };
 
     zen-browser = { url = "github:0xc000022070/zen-browser-flake"; };
 
-    bzmenu.url = "github:e-tho/bzmenu";
-    iwmenu.url = "github:e-tho/iwmenu";
     rep.url = "github:eraserhd/rep";
     llm-agents.url = "github:numtide/llm-agents.nix";
     omp.url = "github:can1357/oh-my-pi";

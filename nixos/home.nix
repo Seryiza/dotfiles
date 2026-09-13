@@ -194,10 +194,6 @@ in {
       force = true;
     };
 
-    # ".npmrc".text = ''
-    #   registry=https://registry.npmjs.org/
-    #   prefix=${config.home.homeDirectory}/.cache/npm/global
-    # '';
   };
 
   home.pointerCursor = {
