@@ -97,13 +97,13 @@ in
         mcps = [ ];
       };
       fixer = {
-        model = "openai/gpt-5.6-sol";
+        model = "openai/gpt-5.6-terra";
         variant = "high";
         mcps = [ ];
       };
       designer = {
-        model = "openai/gpt-5.6-sol";
-        variant = "medium";
+        model = "openai/gpt-5.6-terra";
+        variant = "high";
         mcps = [ ];
       };
       explorer = {
