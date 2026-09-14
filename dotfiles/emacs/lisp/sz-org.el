@@ -479,4 +479,9 @@ ARG is passed to `org-agenda-redo-all'."
   :config
   (org-limit-image-size-activate))
 
+(use-package org-onstate
+  :vc (:url "https://github.com/Seryiza/org-onstate"
+       :rev :newest)
+  :hook (org-mode . org-onstate-mode))
+
 (provide 'sz-org)
