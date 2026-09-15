@@ -47,7 +47,6 @@ in
     llm-agents-pkgs.codex
     llm-agents-pkgs.codex-acp
     llm-agents-pkgs.pi
-    inputs.omp.packages.${system}.omp
     llm-agents-pkgs.qmd
     llm-agents-pkgs.spec-kit
 

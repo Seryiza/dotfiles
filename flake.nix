@@ -23,7 +23,6 @@
 
     rep.url = "github:eraserhd/rep";
     llm-agents.url = "github:numtide/llm-agents.nix";
-    omp.url = "github:can1357/oh-my-pi";
     sysc-greet = {
       url = "github:Nomadcxx/sysc-greet";
       inputs.nixpkgs.follows = "nixpkgs";

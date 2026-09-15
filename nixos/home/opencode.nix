@@ -24,7 +24,7 @@ in
       };
       permission = "allow";
       plugin = [
-        "oh-my-opencode-slim@2.2.19"
+        "oh-my-opencode-slim"
         "@dietrichgebert/ponytail"
         "opencode-command-inject@latest"
       ];
