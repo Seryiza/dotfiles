@@ -484,4 +484,13 @@ ARG is passed to `org-agenda-redo-all'."
        :rev :newest)
   :hook (org-mode . org-onstate-mode))
 
+(use-package org-agenda-shift
+  :vc t
+  :load-path "/home/seryiza/code/org-agenda-shift/"
+
+  :bind
+  (:map org-agenda-mode-map
+        ("C-j" . #'org-agenda-shift-down)
+        ("C-k" . #'org-agenda-shift-up)))
+
 (provide 'sz-org)
