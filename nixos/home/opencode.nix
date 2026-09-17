@@ -74,7 +74,7 @@ in
 
   xdg.configFile."opencode/oh-my-opencode-slim.jsonc".text = builtins.toJSON {
     "$schema" = "https://unpkg.com/oh-my-opencode-slim@2.2.19/oh-my-opencode-slim.schema.json";
-    autoUpdate = false;
+    autoUpdate = true;
     preset = "openai";
     disabled_agents = [
       "observer"
