@@ -83,7 +83,7 @@ in
     presets.openai = {
       orchestrator = {
         model = "openai/gpt-6-astra";
-        variant = "high";
+        variant = "low";
         options.textVerbosity = "low";
         skills = [
           "*"
