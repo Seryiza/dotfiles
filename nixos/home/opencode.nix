@@ -12,7 +12,7 @@ in
 
     settings = {
       "$schema" = "https://opencode.ai/config.json";
-      default_agent = "orchestrator";
+      default_agent = "build";
       mcp.donsetch = {
         type = "local";
         command = [
@@ -37,10 +37,10 @@ in
         build = {
           model = "openai/gpt-6-astra";
           textVerbosity = "low";
-          reasoningEffort = "medium";
+          reasoningEffort = "low";
         };
         explore = {
-          model = "openai/gpt-5.6-luna";
+          model = "openai/gpt-5.6-terra";
           textVerbosity = "low";
           reasoningEffort = "low";
         };
