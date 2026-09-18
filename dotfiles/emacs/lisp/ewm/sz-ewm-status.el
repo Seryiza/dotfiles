@@ -195,9 +195,18 @@
 
 ;;; Builtin clock and battery
 
+(defun sz/ewm-status--system-batteries (directories)
+  "Exclude device-scoped batteries from sysfs DIRECTORIES."
+  (seq-remove (lambda (dir)
+                (battery-search-for-one-match-in-files
+                 (list (expand-file-name "scope" dir)) "^Device$" 0))
+              directories))
+
 (defun sz/ewm-status--battery-update (data)
-  "Hide only a genuinely Full battery; retain 100% Charging immediately."
-  (let ((format (unless (equal (cdr (assq ?B data)) "Full") " %p%% battery")))
+  "Hide battery status at 100% or above, regardless of charging state."
+  (let* ((percent (string-to-number (or (cdr (assq ?p data)) "")))
+         (format (unless (>= percent 100)
+                   " %p%% battery")))
     (setq battery-mode-line-format (or format "")
           ;; `battery-update-functions' runs after the builtin formats its
           ;; string, so replace this update too rather than waiting 60 seconds.
@@ -585,11 +594,13 @@ the old multi-uplink ranking are not part of this mode-line collector."
           (list battery-mode-line-format battery-mode-line-limit display-battery-mode))
     (sz/ewm-status-install-event-advice)
     (setq display-time-format "%d %b %H:%M" display-time-interval 60
-          ;; The builtin default of 100 hides a 100%-Charging battery too.
+          ;; The update hook owns the visibility threshold.
           battery-mode-line-limit 101)
     (display-time-mode 1)
     (when (fboundp 'sz/ewm-mode-line-keep-clock-last)
       (sz/ewm-mode-line-keep-clock-last))
+    (advice-add 'battery--find-linux-sysfs-batteries :filter-return
+                #'sz/ewm-status--system-batteries)
     (add-hook 'battery-update-functions #'sz/ewm-status--battery-update)
     (display-battery-mode 1)
     (add-hook 'after-save-hook #'sz/ewm-status-timeblock-invalidate)
@@ -629,6 +640,7 @@ the old multi-uplink ranking are not part of this mode-line collector."
           sz/ewm-status--dbus-registration-retry nil sz/ewm-status--dbus-pending-refresh nil
           sz/ewm-status--nm-inflight nil sz/ewm-status--power-inflight nil
           sz/ewm-status--dbus-pending nil)
+    (advice-remove 'battery--find-linux-sysfs-batteries #'sz/ewm-status--system-batteries)
     (remove-hook 'battery-update-functions #'sz/ewm-status--battery-update)
     (remove-hook 'after-save-hook #'sz/ewm-status-timeblock-invalidate)
     (remove-hook 'after-revert-hook #'sz/ewm-status-timeblock-invalidate)
