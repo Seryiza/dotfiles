@@ -149,7 +149,7 @@ Use the identity reported by `ewm-list-outputs'."
              ("s-n" . (lambda () (interactive) (sz/ewm--start "wmenu-run" "wmenu-run" "-i" "-b" "-l" "10" "-f" "Iosevka 14")))
              ("s-b" . (lambda () (interactive) (sz/ewm--start "firefox" "firefox")))
              ("S-s-b" . (lambda () (interactive) (sz/ewm--start "run-work-browser" "run-work-browser")))
-             ("s-e" . sz/ewm-launch-enpass)
+             ("M-s-e" . sz/ewm-launch-enpass)
              ("s-m" . ewm-frame-new)
              ("M-s-," . ewm-frame-new)
              ("M-s-." . ewm-frame-new)
