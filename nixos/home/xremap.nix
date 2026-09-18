@@ -14,6 +14,11 @@
       remap = {
         "CapsLock" = "Control_L";
         "KEY_F23" = "Control_R";
+        "Super_L" = {
+          held = "Super_L";
+          alone = "KEY_F13";
+          alone_timeout_millis = 250;
+        };
       };
     }];
 

@@ -202,9 +202,11 @@
 
 (setopt display-line-numbers-width 3)
 
-(setopt display-time-format "%a %F %T")
-(setopt display-time-interval 1)
-(display-time-mode -1)
+;; Reloading the base config must not override the running EWM clock.
+(unless (bound-and-true-p sz/ewm-status-active)
+  (setopt display-time-format "%a %F %T")
+  (setopt display-time-interval 1)
+  (display-time-mode -1))
 
 ;; Default frame configuration
 (setq frame-resize-pixelwise t)
@@ -629,7 +631,9 @@ instead.  Return non-nil when Emacs handled the close request."
 
 (use-package flycheck
   :ensure t
-  :init (global-flycheck-mode))
+  :init
+  (setq flycheck-global-modes '(not ewm-surface-mode))
+  (global-flycheck-mode))
 
 (use-package nix-mode
   :ensure t

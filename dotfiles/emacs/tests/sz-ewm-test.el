@@ -2,6 +2,7 @@
 
 (require 'ert)
 (require 'cl-lib)
+(require 'tab-line)
 
 (defconst sz/ewm-test-emacs-directory
   (file-name-as-directory
@@ -66,6 +67,15 @@
 (load (expand-file-name "lisp/functions/sz-org-capture-frame.el" sz/ewm-test-emacs-directory)
       nil 'nomessage t)
 
+(ert-deftest sz/ewm-capture-selects-english-before-opening-menu ()
+  (let (calls)
+    (cl-letf (((symbol-function 'ewm-switch-layout-module)
+               (lambda (layout) (push (list 'layout layout) calls)))
+              ((symbol-function 'org-capture)
+               (lambda () (interactive) (push 'capture calls))))
+      (call-interactively #'sz/ewm-org-capture))
+    (should (equal (reverse calls) '((layout "us") capture)))))
+
 (ert-deftest sz/ewm-profile-keeps-editor-prefixes-out-of-external-apps ()
   (let ((ewm--module-mode nil)
         (sz/ewm-output-selector nil)
@@ -75,18 +85,27 @@
     (should (eq (lookup-key ewm-mode-map (kbd "M-s-,")) #'ewm-frame-new))
     (should (eq (lookup-key ewm-mode-map (kbd "s-w")) #'ewm-frame-close))
     (should (eq (lookup-key ewm-mode-map (kbd "M-s-l")) #'sz/ewm-split-right))
-    (should (eq (lookup-key ewm-mode-map (kbd "s-;")) #'org-capture))
+    (should (eq (lookup-key ewm-mode-map (kbd "s-j")) #'tab-line-switch-to-next-tab))
+    (should (eq (lookup-key ewm-mode-map (kbd "s-k")) #'tab-line-switch-to-prev-tab))
+    (should (eq (lookup-key ewm-mode-map (kbd "s-;")) #'sz/ewm-org-capture))
+    (should (eq (lookup-key global-map (kbd "M-:")) #'eval-expression))
     (should (eq (lookup-key ewm-mode-map (kbd "S-s-e")) #'sz/ewm-logout))
     (should-not ewm-surface-emulate-keys)
     (should (eq confirm-kill-emacs #'yes-or-no-p))
     (cl-letf (((symbol-function 'ewm-intercept-keys-module)
                (lambda (specs) (setq sent specs))))
       (ewm--send-intercept-keys))
-    (dolist (description '("C-x" "C-u" "C-h" "M-x"))
+    (should (seq-find (lambda (spec)
+                       (equal (plist-get spec :description) "M-:"))
+                     sent))
+    (should (seq-find (lambda (spec)
+                       (equal (plist-get spec :description) "M-x"))
+                     sent))
+    (dolist (description '("C-x" "C-u" "C-h"))
       (should-not (seq-find (lambda (spec)
                               (equal (plist-get spec :description) description))
                             sent)))
-    (dolist (description '("s-<escape>" "S-s-e" "s-<f8>" "S-s-<f8>" "s-;"
+    (dolist (description '("s-f" "s-u" "s-<escape>" "S-s-e" "s-<f8>" "S-s-<f8>" "s-;"
                            "<Print>" "C-<Print>" "S-<Print>"
                            "<MonBrightnessUp>" "<MonBrightnessDown>"
                            "<AudioPlay>" "<AudioRaiseVolume>"
@@ -98,7 +117,176 @@
         (should spec)
         (should (eq (plist-get spec :fullscreen) t))))
     (dolist (spec (append sent nil))
-      (should-not (plist-member spec :translate)))))
+      (should-not (plist-member spec :translate))
+      (ert-info ((plist-get spec :description))
+        (if (member (plist-get spec :description) '("M-:" "M-x"))
+            (should (eq (plist-get spec :fullscreen) :false))
+          (should (eq (plist-get spec :fullscreen) t)))))))
+
+(ert-deftest sz/ewm-super-tap-tools-event-opens-keypad ()
+  ;; evdev's KEY_F13 becomes XF86Tools under the standard XKB inet mapping;
+  ;; PGTK exposes that keysym to Emacs as Tools.
+  (let (sent called)
+    (should (eq (lookup-key ewm-mode-map [Tools]) #'meow-keypad))
+    (cl-letf (((symbol-function 'ewm-intercept-keys-module)
+               (lambda (specs) (setq sent specs)))
+              ((symbol-function 'meow-keypad)
+               (lambda () (interactive) (setq called t))))
+      (ewm--send-intercept-keys)
+      (let ((spec (seq-find (lambda (entry)
+                             (equal (plist-get entry :description) "<Tools>"))
+                           sent)))
+        (should spec)
+        (should (eq (plist-get spec :fullscreen) t))
+        (should (equal (plist-get spec :dispatch) "command")))
+      (should (equal (lookup-key function-key-map [XF86Tools]) [Tools]))
+      (ewm--handle-intercepted-command '((key . "<Tools>")))
+      (should called))))
+
+(ert-deftest sz/ewm-intercepted-commands-use-the-selected-window-buffer ()
+  ;; Live failure: the event callback's current buffer stays on Telegram
+  ;; while the selected window shows Ghostty or Firefox.
+  (let* ((ewm--module-mode nil)
+         (ewm--surfaces (make-hash-table :test #'eql))
+         (tab-line-tabs-function #'tab-line-tabs-fixed-window-buffers)
+         (tab-line-switch-cycling nil)
+         (buffers (mapcar #'generate-new-buffer
+                          '("*ewm-test-ghostty*" "*ewm-test-telegram*"
+                            "*ewm-test-firefox*")))
+         visited)
+    (unwind-protect
+        (save-window-excursion
+          (cl-loop for buffer in buffers for id from 3 do
+                   (with-current-buffer buffer
+                     (ewm-surface-mode)
+                     (setq-local ewm-surface-id id)
+                     (puthash id buffer ewm--surfaces)))
+          (switch-to-buffer (car buffers))
+          (set-window-prev-buffers nil nil)
+          (set-window-next-buffers nil nil)
+          (set-window-parameter nil 'tab-line-buffers nil)
+          (dolist (buffer buffers)
+            (switch-to-buffer buffer)
+            (funcall tab-line-tabs-function))
+          (tab-line-select-tab-buffer (car buffers) (selected-window))
+          ;; Repeated presses at either edge must keep the endpoint selected.
+          ;; A previous click in another window must not redirect keyboard commands.
+          (let ((last-nonmenu-event
+                 (list 'mouse-1 (list (split-window-right) 'tab-line '(0 . 0) 0))))
+            (dolist (key '("s-k" "s-j" "s-j" "s-j" "s-j"
+                           "s-k" "s-k" "s-k" "s-k"))
+              (with-current-buffer (nth 1 buffers)
+                (ewm--handle-event `((event . "intercepted-command") (key . ,key))))
+              (push (buffer-local-value 'ewm-surface-id (window-buffer)) visited)))
+          (should (equal (nreverse visited) '(3 4 5 5 5 4 3 3 3)))
+          ;; A shared dispatcher fix must also target the right buffer for
+          ;; commands other than cycling, without killing the callback buffer.
+          (with-current-buffer (nth 1 buffers)
+            (ewm--handle-event '((event . "intercepted-command") (key . "s-u"))))
+          (should-not (buffer-live-p (car buffers)))
+          (should (buffer-live-p (nth 1 buffers))))
+      (mapc (lambda (buffer)
+              (when (buffer-live-p buffer) (kill-buffer buffer)))
+            buffers))))
+
+(ert-deftest sz/ewm-tab-line-uses-native-buffer-tabs ()
+  (let ((ewm-mode t)
+        (ewm--module-mode nil)
+        (ewm--surfaces (make-hash-table :test #'eql))
+        (editor (generate-new-buffer "ewm-tab-test.org"))
+        (tab-line-tabs-function tab-line-tabs-function)
+        (tab-line-switch-cycling tab-line-switch-cycling)
+        (tab-line-tab-name-function tab-line-tab-name-function)
+        (tab-line-tab-name-truncated-max tab-line-tab-name-truncated-max)
+        (tab-line-new-button-show tab-line-new-button-show)
+        (tab-line-close-button-show tab-line-close-button-show))
+    (unwind-protect
+        (save-window-excursion
+          (sz/ewm-tab-line-setup)
+          (should global-tab-line-mode)
+          (should (eq tab-line-tabs-function #'tab-line-tabs-fixed-window-buffers))
+          (should-not tab-line-switch-cycling)
+          (should (eq tab-line-tab-name-function #'tab-line-tab-name-truncated-buffer))
+          (should (= tab-line-tab-name-truncated-max 50))
+          (with-current-buffer editor (org-mode))
+          (dolist (id '(3 5))
+            (ewm--create-surface-buffer id "tab-test" 0))
+          (run-hooks 'post-command-hook)
+          (let ((first (gethash 3 ewm--surfaces))
+                (second (gethash 5 ewm--surfaces))
+                new)
+            (switch-to-buffer first)
+            (set-window-prev-buffers nil nil)
+            (set-window-next-buffers nil nil)
+            (set-window-parameter nil 'tab-line-buffers nil)
+            (dolist (buffer (list first editor second))
+              (switch-to-buffer buffer)
+              (funcall tab-line-tabs-function))
+            (should (equal (funcall tab-line-tabs-function) (list first editor second)))
+            (tab-line-select-tab-buffer editor (selected-window))
+            ;; Native tabs append a newly displayed buffer even from the middle.
+            (ewm--create-surface-buffer 7 "tab-test" 0)
+            (setq new (gethash 7 ewm--surfaces))
+            (cl-letf (((symbol-function 'ewm--surface-target-frame-for-output)
+                       (lambda (_) (selected-frame))))
+              (ewm--place-surface-buffer new nil nil nil))
+            (run-hooks 'post-command-hook)
+            (should (equal (funcall tab-line-tabs-function) (list first editor second new)))
+            (ewm--handle-event '((event . "intercepted-command") (key . "s-j")))
+            (should (eq (window-buffer) new))
+            (ewm--handle-event '((event . "intercepted-command") (key . "s-k")))
+            (should (eq (window-buffer) second))
+            (ewm--handle-event '((event . "intercepted-command") (key . "s-k")))
+            (should (eq (window-buffer) editor))
+            (with-current-buffer (window-buffer)
+              (should tab-line-mode)
+              (should (tab-line-format))
+              (should-not tab-line-new-button-show)
+              (should-not tab-line-close-button-show)
+              (rename-buffer (make-string 80 ?x) t)
+              (should (<= (string-width (funcall tab-line-tab-name-function editor)) 50))
+              (should (get-text-property
+                       0 'selected
+                       (tab-line-tab-name-format-default editor (funcall tab-line-tabs-function)))))
+            (ewm--handle-close-surface '((id . 5)))
+            (should (equal (funcall tab-line-tabs-function) (list first editor new)))))
+      (global-tab-line-mode -1)
+      (kill-buffer editor)
+      (maphash (lambda (_ buffer)
+                 (when (buffer-live-p buffer) (kill-buffer buffer)))
+               ewm--surfaces)))
+  (let ((ewm-mode nil))
+    (sz/ewm-tab-line-setup)
+    (should-not global-tab-line-mode)))
+
+(ert-deftest sz/ewm-tab-line-truncated-isolate-native-redisplay ()
+  ;; Run on an isolated graphical display: Emacs 30.2 aborts here before
+  ;; the workaround.  Batch/terminal rendering cannot catch this crash.
+  (skip-unless (display-graphic-p))
+  (let ((ewm-mode t)
+        (buffer (generate-new-buffer
+                 (concat "*ewm:test\u2068" (make-string 80 ?x) "\u2069*"))))
+    (unwind-protect
+        (save-window-excursion
+          (sz/ewm-tab-line-setup)
+          (switch-to-buffer buffer)
+          (set-window-prev-buffers nil nil)
+          (set-window-next-buffers nil nil)
+          (set-window-parameter nil 'tab-line-buffers nil)
+          (set-window-parameter nil 'tab-line-cache nil)
+          ;; Recreate the boxed close button present in the original core,
+          ;; even though the user's current preference hides it.
+          (let ((tab-line-close-button-show t))
+            (let ((name (funcall tab-line-tab-name-function buffer)))
+              (should (string-match-p "\u2068" name))
+              (should-not (string-match-p "\u2069" name)))
+            (should (tab-line-format))
+            (redisplay t))
+          ;; The workaround must leave real buffer text bidi-enabled.
+          (should bidi-display-reordering)
+          (should (default-value 'bidi-display-reordering)))
+      (global-tab-line-mode -1)
+      (kill-buffer buffer))))
 
 (ert-deftest sz/ewm-refresh-survives-upstream-output-reapply ()
   (let ((sz/ewm-output-selector "Live output selector")

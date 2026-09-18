@@ -8,6 +8,12 @@
 
 (defconst sz/ewm-mode-line--divider " · ")
 
+(defun sz/ewm-mode-line--join (&rest fields)
+  "Join nonblank status FIELDS with the same separator used for width budgets."
+  (string-join (mapcar #'string-trim
+                       (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p fields))
+               sz/ewm-mode-line--divider))
+
 (defun sz/ewm-mode-line--surface-p ()
   "Return non-nil when the current buffer is an EWM surface proxy."
   (derived-mode-p 'ewm-surface-mode))
@@ -66,24 +72,13 @@
                             4))))
       text)))
 
-(defun sz/ewm-mode-line--index (label item items)
-  "Format LABEL's one-based position of ITEM in ITEMS, or nil."
-  (when-let ((position (cl-position item items)))
-    (format "%s %d/%d" label (1+ position) (length items))))
-
-(defun sz/ewm-mode-line--workspace (frame)
-  "Return FRAME's strip position on its current EWM output.
-This reads EWM's in-memory strip only; it never consults the compositor."
-  (when-let* ((output (frame-parameter frame 'ewm-output))
-              ((fboundp 'ewm--strip-frames))
-              (frames (ewm--strip-frames output)))
-    (sz/ewm-mode-line--index "W" frame frames)))
-
-(defun sz/ewm-mode-line--tile (frame)
-  "Return the selected native tile position within FRAME, or nil."
-  (let* ((windows (window-list frame 'no-minibuf))
-         (selected (frame-selected-window frame)))
-    (sz/ewm-mode-line--index "T" selected windows)))
+(defun sz/ewm-mode-line--tabs ()
+  "Return the selected buffer's position in the window's native tab line."
+  (when (bound-and-true-p tab-line-mode)
+    (let* ((buffers (funcall tab-line-tabs-function))
+           (position (cl-position (window-buffer) buffers)))
+      (when position
+        (format "Tabs %d/%d" (1+ position) (length buffers))))))
 
 (defun sz/ewm-mode-line--narrow-audio (audio)
   "Keep AUDIO's meaningful warning on a narrow tile, if it has one."
@@ -91,19 +86,16 @@ This reads EWM's in-memory strip only; it never consults the compositor."
         ((string-suffix-p " +MIC" audio) "+MIC")
         ((string= audio "audio?") audio)))
 
-(defun sz/ewm-mode-line--desktop-status (&optional width frame tile-width)
-  "Return cached EWM status for WIDTH columns on TILE-WIDTH and FRAME.
-The result is one string from a mode-line `:eval' form, so literal percent
-signs in titles and cached status values are not mode-line escapes."
+(defun sz/ewm-mode-line--desktop-status (&optional width tile-width)
+  "Return in-memory EWM status for WIDTH columns on TILE-WIDTH.
+Escape literal percent signs only when embedding this text in the mode line."
   (let* ((width (or width (sz/ewm-mode-line--window-width)))
          ;; WIDTH can be just the share reserved for status.  It constrains
          ;; content, but it is not the tile geometry that determines whether
          ;; optional desktop state belongs on a normal-sized display.
          (tile-width (or tile-width width))
-         (frame (or frame (selected-frame)))
          (narrow (< tile-width 100))
-         (workspace (sz/ewm-mode-line--workspace frame))
-         (tile (and (not narrow) (sz/ewm-mode-line--tile frame)))
+         (tabs (sz/ewm-mode-line--tabs))
          (timeblock (sz/ewm-mode-line--cached 'sz/ewm-status-timeblock))
          (audio (sz/ewm-mode-line--cached 'sz/ewm-status-audio))
          (network (sz/ewm-mode-line--cached 'sz/ewm-status-network))
@@ -112,23 +104,21 @@ signs in titles and cached status values are not mode-line escapes."
          (power-saver (sz/ewm-mode-line--cached 'sz/ewm-status-power-saver))
          (audio-warning (and audio (sz/ewm-mode-line--narrow-audio audio)))
          (audio (if narrow audio-warning audio))
-         (fields (delq nil (list workspace tile audio network
+         (fields (delq nil (list tabs audio network
                                  (and (not narrow) layout)
                                  (and (not narrow) power-saver)))))
-    ;; Keep fixed warnings whole.  When space runs out, T goes first, then
-    ;; ordinary numeric volume (while retaining its +MIC warning).
-    (when (> (string-width (string-join fields sz/ewm-mode-line--divider)) width)
-      (setq fields (delq tile fields)))
-    (when (> (string-width (string-join fields sz/ewm-mode-line--divider)) width)
+    ;; Keep the tab count and warnings whole.  Drop ordinary numeric volume
+    ;; first when space runs out, while retaining its +MIC warning.
+    (when (> (string-width (apply #'sz/ewm-mode-line--join fields)) width)
       (setq fields (delq audio fields)
             audio audio-warning)
       (when audio
         (setq fields (append fields (list audio)))))
     (dolist (field (list power-saver layout))
-      (when (> (string-width (string-join fields sz/ewm-mode-line--divider)) width)
+      (when (> (string-width (apply #'sz/ewm-mode-line--join fields)) width)
         (setq fields (delq field fields))))
     (let* ((fixed-width (string-width
-                         (string-join fields sz/ewm-mode-line--divider)))
+                         (apply #'sz/ewm-mode-line--join fields)))
            (variable-count (+ (if timeblock 1 0) (if wireguard 1 0)))
            (content-width (max 0 (- width fixed-width
                                     (* variable-count
@@ -141,19 +131,16 @@ signs in titles and cached status values are not mode-line escapes."
                                  (if timeblock
                                      (/ content-width 2)
                                    content-width))))
-      (string-join
-       (delq nil
-             (list workspace
-                   (and (memq tile fields) tile)
-                   (and (> (or time-width 0) 0)
-                        (sz/ewm-mode-line--truncate timeblock time-width))
-                   (and (memq audio fields) audio)
-                   (and (memq network fields) network)
-                   (and (> (or wireguard-width 0) 0)
-                        (sz/ewm-mode-line--truncate wireguard wireguard-width))
-                   (and (memq layout fields) layout)
-                   (and (memq power-saver fields) power-saver)))
-       sz/ewm-mode-line--divider))))
+      (sz/ewm-mode-line--join
+       tabs
+       (and (> (or time-width 0) 0)
+            (sz/ewm-mode-line--truncate timeblock time-width))
+       (and (memq audio fields) audio)
+       (and (memq network fields) network)
+       (and (> (or wireguard-width 0) 0)
+            (sz/ewm-mode-line--truncate wireguard wireguard-width))
+       (and (memq layout fields) layout)
+       (and (memq power-saver fields) power-saver)))))
 
 (defconst sz/ewm-mode-line--editor-indicators
   '(:propertize
@@ -168,16 +155,13 @@ signs in titles and cached status values are not mode-line escapes."
 (defun sz/ewm-mode-line--editor-context ()
   "Return the existing editor-only right-side context for ordinary buffers."
   (unless (sz/ewm-mode-line--surface-p)
-    (string-join
-     (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                       (list (sz/ewm-mode-line--format
-                              '(project-mode-line project-mode-line-format))
-                             (sz/ewm-mode-line--format sz/ewm-mode-line--editor-indicators)))
-     " ")))
+    (sz/ewm-mode-line--join
+     (sz/ewm-mode-line--format '(project-mode-line project-mode-line-format))
+     (sz/ewm-mode-line--format sz/ewm-mode-line--editor-indicators))))
 
 (defun sz/ewm-mode-line--nonempty-p (text)
-  "Return non-nil when TEXT is a nonempty mode-line string."
-  (and (stringp text) (not (string-empty-p text))))
+  "Return non-nil when TEXT is a nonblank mode-line string."
+  (and (stringp text) (not (string-blank-p text))))
 
 (defun sz/ewm-mode-line--global-context (&optional width components)
   "Return global status once, shortening only Org clock text for WIDTH.
@@ -191,7 +175,9 @@ clocked heading.  With COMPONENTS, return (OTHER ORG TIME) unjoined."
           (other-items (cl-remove-if (lambda (item)
                                        (memq item '(org-mode-line-string display-time-string)))
                                      items))
-          (other (sz/ewm-mode-line--format (cons "" other-items)))
+          (other (apply #'sz/ewm-mode-line--join
+                        (mapcar (lambda (item) (sz/ewm-mode-line--format (list "" item)))
+                                other-items)))
           (org (and org-items
                     (sz/ewm-mode-line--format (cons "" org-items))))
           (time (and time-items
@@ -200,11 +186,7 @@ clocked heading.  With COMPONENTS, return (OTHER ORG TIME) unjoined."
           ;; app title.  Built-in non-Org items are never clipped here.
           (org-width (and width
                           (max 0 (- (/ width 3)
-                                    (string-width (string-join
-                                                   (cl-remove-if-not
-                                                    #'sz/ewm-mode-line--nonempty-p
-                                                    (list other time))
-                                                   " "))))))
+                                    (string-width (sz/ewm-mode-line--join other time))))))
           (org (and (sz/ewm-mode-line--nonempty-p org)
                     (if org-width
                         (and (> org-width 0)
@@ -212,9 +194,7 @@ clocked heading.  With COMPONENTS, return (OTHER ORG TIME) unjoined."
                       org))))
     (if components
         (list other org time)
-      (string-join (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                                      (list other org time))
-                   " "))))
+      (sz/ewm-mode-line--join other org time))))
 
 (defun sz/ewm-mode-line-keep-clock-last ()
   "Move an existing display clock last; never start, stop, or add one.
@@ -233,52 +213,43 @@ The EWM status collector owns display-time and battery lifecycle."
         (sz/ewm-mode-line--format 'mode-line-misc-info)
       (let ((editor (sz/ewm-mode-line--editor-context)))
         (if (not (mode-line-window-selected-p))
-            editor
+            (sz/ewm-mode-line--join editor)
           (let* ((global-parts (sz/ewm-mode-line--global-context nil t))
                (global-other (nth 0 global-parts))
                (global-org (nth 1 global-parts))
                (global-time (nth 2 global-parts))
-               ;; This is the non-negotiable floor: W and whole warnings,
+               ;; This is the non-negotiable floor: Tabs and whole warnings,
                ;; plus the actual battery/clock strings in the global parts.
                ;; Tiny tiles may be narrower than the floor, by design.
                (desktop-floor (and (sz/ewm-mode-line--desktop-p)
-                                   (sz/ewm-mode-line--desktop-status 0 nil width)))
-               (fixed (string-join
-                       (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                                         (list editor desktop-floor global-other global-time))
-                       " "))
+                                   (sz/ewm-mode-line--desktop-status 0 width)))
+               (fixed (sz/ewm-mode-line--join editor desktop-floor global-other global-time))
                ;; Give status half the remaining room, then let Org reclaim
                ;; whatever its actual timeblock/WG rendering did not use.
                (desktop-budget (+ (string-width (or desktop-floor ""))
                                   (max 0 (/ (- width (string-width fixed)) 2))))
                (desktop (and (sz/ewm-mode-line--desktop-p)
-                             (sz/ewm-mode-line--desktop-status desktop-budget nil width)))
-               (without-org (string-join
-                             (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                                               (list editor desktop global-other global-time))
-                             " "))
+                             (sz/ewm-mode-line--desktop-status desktop-budget width)))
+               (without-org (sz/ewm-mode-line--join editor desktop global-other global-time))
                (org-width (and global-org
-                               (max 0 (- width (string-width without-org) 1))))
-               (global (string-join
-                        (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                                          (list global-other
-                                                (and org-width (> org-width 0)
-                                                     (sz/ewm-mode-line--truncate global-org org-width))
-                                                global-time))
-                        " ")))
-          (string-join (cl-remove-if-not #'sz/ewm-mode-line--nonempty-p
-                                         (list editor desktop global))
-                       " ")))))))
+                               (max 0 (- width (string-width without-org)
+                                         (string-width sz/ewm-mode-line--divider))))))
+            (sz/ewm-mode-line--join
+             editor desktop global-other
+             (and org-width (> org-width 0)
+                  (sz/ewm-mode-line--truncate global-org org-width))
+             global-time)))))))
 
 (setq-default mode-line-format
               '("%e"
                 (:eval (meow-indicator))
                 " "
-                (:eval (sz/ewm-mode-line--identification))
+                (:eval (string-replace "%" "%%" (sz/ewm-mode-line--identification)))
                 (:eval (unless (sz/ewm-mode-line--surface-p) "  "))
                 (:eval (unless (sz/ewm-mode-line--surface-p)
-                         (sz/ewm-mode-line--format mode-line-position)))
+                         (string-replace "%" "%%"
+                                         (sz/ewm-mode-line--format mode-line-position))))
 
                 mode-line-format-right-align
-                (:eval (sz/ewm-mode-line--right-context))
+                (:eval (string-replace "%" "%%" (sz/ewm-mode-line--right-context)))
                 mode-line-end-spaces))

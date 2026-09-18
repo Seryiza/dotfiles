@@ -20,8 +20,11 @@
   (load custom-file nil 'nomessage t))
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
-(add-to-list 'load-path (locate-user-emacs-file "lisp/ewm"))
-(require 'sz-ewm)
+(use-package sz-ewm
+  :ensure nil
+  :catch nil
+  :load-path "lisp/ewm"
+  :demand t)
 
 (let* ((dir (locate-user-emacs-file "lisp"))
        (functions-dir (expand-file-name "functions" dir))

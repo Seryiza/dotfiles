@@ -1,13 +1,15 @@
 ;;; sz-ewm.el --- Minimal EWM session integration -*- lexical-binding: t -*-
 
+(require 'use-package)
+(require 'tab-line)
+
 (defgroup sz/ewm nil
   "Personal EWM session integration."
   :group 'environment)
 
-(defcustom sz/ewm-output-selector nil
+(defcustom sz/ewm-output-selector "eDP-1"
   "Connector or Make-Model-Serial selector for the built-in output.
-Set this from `ewm-list-outputs' after the first live EWM session; it is
-intentionally nil until the actual output identity is known."
+Use the identity reported by `ewm-list-outputs'."
   :type '(choice (const :tag "Unset" nil) string)
   :group 'sz/ewm)
 
@@ -30,11 +32,19 @@ intentionally nil until the actual output identity is known."
 
 (defun sz/ewm--start (name program &rest args)
   "Start PROGRAM with ARGS under process NAME."
-  (apply #'start-process name nil program args))
+  ;; Avoid SIGHUP to launched apps when a short-lived launcher exits.
+  (let ((process-connection-type nil))
+    (apply #'start-process name nil program args)))
 
 (defun sz/ewm--start-shell (name command)
   "Start fixed shell COMMAND under process NAME."
   (start-process-shell-command name nil command))
+
+(defun sz/ewm-org-capture ()
+  "Select the English XKB layout before opening the capture menu."
+  (interactive)
+  (ewm-switch-layout-module "us")
+  (call-interactively #'org-capture))
 
 (defun sz/ewm-lock ()
   "Lock the current session with the existing swaylock policy."
@@ -93,10 +103,49 @@ intentionally nil until the actual output identity is known."
   (interactive)
   (select-window (split-window-right)))
 
-(defun sz/ewm--install-keymap ()
-  "Install the accepted native EWM and hardware bindings."
-  (dolist (binding
-           '(("s-y" . (lambda () (interactive) (sz/ewm--start "ghostty" "ghostty" "+new-window")))
+(defun sz/ewm--dispatch-in-selected-buffer (function &rest args)
+  "Run intercepted FUNCTION with ARGS in the selected window's buffer."
+  ;; EWM's async callback can retain a different current buffer after focus moves.
+  (with-current-buffer (window-buffer (selected-window))
+    ;; These are keyboard commands, not a replay of the last mouse event.
+    (let ((last-nonmenu-event nil))
+      (apply function args))))
+
+(defun sz/ewm-tab-line-setup ()
+  "Enable ordinary Emacs buffer tabs throughout the EWM session."
+  (when (bound-and-true-p ewm-mode)
+    ;; Emacs 30.2 aborts measuring truncated bidi isolates with boxed faces.
+    ;; ponytail: LTR width measurement until the upstream bidi bug is fixed.
+    (with-current-buffer tab-line-auto-hscroll-buffer
+      (setq-local bidi-display-reordering nil))
+    (setq-default tab-line-tabs-function #'tab-line-tabs-fixed-window-buffers
+                  tab-line-switch-cycling nil
+                  tab-line-close-button-show nil
+                  tab-line-new-button-show nil
+                  tab-line-tab-name-function #'tab-line-tab-name-truncated-buffer
+                  tab-line-tab-name-truncated-max 50)
+    (global-tab-line-mode 1)))
+
+(defun sz/ewm-apply-profile ()
+  "Send the configured EWM profile without restarting its compositor."
+  (interactive)
+  (sz/ewm--apply-output-profile)
+  (when (bound-and-true-p ewm--module-mode)
+    (ewm--send-input-config)
+    (ewm--send-intercept-keys)
+    (ewm--apply-output-config)))
+
+(use-package ewm
+  :ensure nil
+  :catch nil
+  ;; The Nix session loads EWM after personal init; ordinary Emacs stays deferred.
+  :defer t
+  :hook (ewm-mode . sz/ewm-tab-line-setup)
+  :bind (:map ewm-mode-map
+             ("<f13>" . meow-keypad)
+             ;; XKB inet maps xremap's KEY_F13 to XF86Tools (PGTK: Tools).
+             ("<Tools>" . meow-keypad)
+             ("s-y" . (lambda () (interactive) (sz/ewm--start "ghostty" "ghostty" "+new-window")))
              ("s-n" . (lambda () (interactive) (sz/ewm--start "wmenu-run" "wmenu-run" "-i" "-b" "-l" "10" "-f" "Iosevka 14")))
              ("s-b" . (lambda () (interactive) (sz/ewm--start "firefox" "firefox")))
              ("S-s-b" . (lambda () (interactive) (sz/ewm--start "run-work-browser" "run-work-browser")))
@@ -105,7 +154,7 @@ intentionally nil until the actual output identity is known."
              ("M-s-," . ewm-frame-new)
              ("M-s-." . ewm-frame-new)
              ("s-w" . ewm-frame-close)
-             ("s-;" . org-capture)
+             ("s-;" . sz/ewm-org-capture)
              ("s-<escape>" . sz/ewm-lock)
              ("S-s-e" . sz/ewm-logout)
              ("s-<f8>" . sz/ewm-power-saver)
@@ -115,8 +164,11 @@ intentionally nil until the actual output identity is known."
              ("s-h" . ewm-focus-left)
              ("s-l" . ewm-focus-right)
              ("M-s-l" . sz/ewm-split-right)
-             ("s-k" . ewm-next-surface-buffer)
-             ("s-j" . ewm-prev-surface-buffer)
+             ("s-k" . tab-line-switch-to-prev-tab)
+             ("s-j" . tab-line-switch-to-next-tab)
+             ("s-<tab>" . tab-line-switch-to-next-tab)
+             ("S-s-<tab>" . tab-line-switch-to-prev-tab)
+             ("s-<iso-lefttab>" . tab-line-switch-to-prev-tab)
              ("s-f" . ewm-toggle-fullscreen)
              ("s-u" . kill-current-buffer)
              ("C-S-s-r" . sz/ewm-apply-profile)
@@ -131,12 +183,12 @@ intentionally nil until the actual output identity is known."
              ("<AudioMicMute>" . (lambda () (interactive) (sz/ewm--start-shell "microphone-mute" "toggle-microphone-mute && display-current-microphone")))
              ("<HomePage>" . (lambda () (interactive) (sz/ewm--start-shell "microphone-mute" "toggle-microphone-mute && display-current-microphone")))
              ("<AudioMute>" . (lambda () (interactive) (sz/ewm--start-shell "audio-mute" "toggle-audio-mute && display-current-volume")))
-             ("S-s-m" . (lambda () (interactive) (sz/ewm--start-shell "audio-mute" "toggle-audio-mute && display-current-volume")))))
-    (keymap-set ewm-mode-map (car binding) (cdr binding))))
-
-(defun sz/ewm-apply-profile ()
-  "Reapply this EWM profile without restarting its compositor."
-  (interactive)
+             ("S-s-m" . (lambda () (interactive) (sz/ewm--start-shell "audio-mute" "toggle-audio-mute && display-current-volume"))))
+  :config
+  ;; Floating frames must not inherit default-frame-alist's maximized state.
+  (setf (alist-get 'fullscreen pop-up-frame-alist) nil)
+  (advice-add 'ewm--handle-intercepted-command :around
+              #'sz/ewm--dispatch-in-selected-buffer)
   (setq-default
    ;; Keep the River-like static, opaque desktop and persistent pointer.
    ewm-animations-enabled nil
@@ -148,31 +200,28 @@ intentionally nil until the actual output identity is known."
                :xkb-options "grp:ctrl_space_toggle,custom:types,custom:positional-latin-shortcuts")
      (touchpad :tap t :tap-button-map "left-right-middle"
                :natural-scroll t :dwt t :middle-emulation t))
-   ewm-intercept-prefixes
-   '(("s-<escape>" :fullscreen) ("S-s-e" :fullscreen)
-     ("s-<f8>" :fullscreen) ("S-s-<f8>" :fullscreen)
-     ("s-;" :fullscreen)
-     ("<Print>" :fullscreen) ("C-<Print>" :fullscreen) ("S-<Print>" :fullscreen)
-     ("<MonBrightnessUp>" :fullscreen) ("<MonBrightnessDown>" :fullscreen)
-     ("<AudioPlay>" :fullscreen) ("<AudioRaiseVolume>" :fullscreen)
-     ("<AudioLowerVolume>" :fullscreen) ("<AudioMicMute>" :fullscreen)
-     ("<HomePage>" :fullscreen) ("<AudioMute>" :fullscreen)
-     ("S-s-m" :fullscreen))
+   ewm-intercept-prefixes '("M-:" "M-x")
    ;; Do not turn Super-c/v into Ctrl-c/v: terminal Ctrl-c is SIGINT, not copy.
    ewm-surface-emulate-keys nil
    confirm-kill-emacs #'yes-or-no-p)
-  (sz/ewm--apply-output-profile)
-  (sz/ewm--install-keymap)
-  (when (bound-and-true-p ewm--module-mode)
-    (ewm--send-input-config)
-    (ewm--send-intercept-keys)
-    (ewm--apply-output-config)))
+  (use-package sz-ewm-status
+    :ensure nil
+    :catch nil
+    :demand t
+    :hook ((ewm-mode . sz/ewm-status-start)
+           (kill-emacs . sz/ewm-status-stop))
+    :config
+    (sz/ewm-status-install-event-advice)))
 
+;; Run after :bind has populated the keymap, including when EWM is already loaded.
 (with-eval-after-load 'ewm
-  (require 'sz-ewm-status)
-  (sz/ewm-status-install-event-advice)
-  (add-hook 'ewm-mode-hook #'sz/ewm-status-start)
-  (add-hook 'kill-emacs-hook #'sz/ewm-status-stop)
+  ;; Keep active EWM bindings available even when a client is fullscreen.
+  (map-keymap
+   (lambda (key binding)
+     (when (ewm--live-binding-p binding)
+       (add-to-list 'ewm-intercept-prefixes
+                    (list (key-description (vector key)) :fullscreen))))
+   ewm-mode-map)
   (sz/ewm-apply-profile))
 
 (provide 'sz-ewm)
