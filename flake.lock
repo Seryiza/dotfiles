@@ -82,6 +82,22 @@
         "type": "github"
       }
     },
+    "ewm": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789312548,
+        "narHash": "sha256-YnZ2c66gK5p+DxXClQ6qHzCcff+ko58HlS+KdjMt8jk=",
+        "ref": "refs/heads/master",
+        "rev": "b8373fe55b914cad99914b65d6b8829fe44b6af6",
+        "revCount": 966,
+        "type": "git",
+        "url": "https://codeberg.org/ezemtsov/ewm.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://codeberg.org/ezemtsov/ewm.git"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -604,6 +620,7 @@
     "root": {
       "inputs": {
         "emacs-lsp-booster": "emacs-lsp-booster",
+        "ewm": "ewm",
         "home-manager": "home-manager",
         "llm-agents": "llm-agents",
         "mango": "mango",

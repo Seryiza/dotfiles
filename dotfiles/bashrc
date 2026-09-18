@@ -29,7 +29,6 @@ PS_INDICATOR="\$"
 export PS1="${PS_DIR} ${PS_INDICATOR} "
 
 # Environment
-export EDITOR="nvim"
 export LEDGER_FILE="/home/seryiza/code/sfinances/main.journal"
 
 # Aliases: ls

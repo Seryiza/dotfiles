@@ -30,6 +30,10 @@
     mango.url = "github:mangowm/mango";
     waybar.url = "github:Alexays/Waybar/09e69e0f48214a1128d62417612bc47e8dc9e36a";
     zed.url = "github:zed-industries/zed/v1.10.1";
+    ewm = {
+      url = "git+https://codeberg.org/ezemtsov/ewm.git";
+      flake = false;
+    };
   };
 
   outputs =
@@ -61,10 +65,12 @@
         inherit system;
         overlays = [ riverOverlay ];
       };
+      ewmModule = import ./nixos/home/ewm.nix { inherit (inputs) ewm; };
     in
     {
       packages.${system} = {
         donsetch = packages.callPackage ./nixos/pkgs/donsetch.nix { };
+        ewm = self.nixosConfigurations.yuri-alpha.config.programs.ewm.ewmPackage;
         inherit (packages) river machi channel zelbar river-zelbar-status;
       };
 
@@ -121,6 +127,26 @@
                 ++ self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.packages;
             }
           );
+
+          ewm-session = packages.callPackage ./nixos/tests/ewm-session.nix (
+            {
+              homeGeneration = self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.home.activationPackage;
+              ewmSystem = builtins.head (
+                builtins.filter (pkg: pkg.name == "ewm-system")
+                  self.nixosConfigurations.yuri-alpha.config.environment.systemPackages
+              );
+              ewmPortalConfig = self.nixosConfigurations.yuri-alpha.config.environment.etc."xdg/xdg-desktop-portal/ewm-portals.conf".source;
+              xwaylandSatellite = builtins.head (
+                builtins.filter (pkg: builtins.match "xwayland-satellite-.*" pkg.name != null)
+                  self.nixosConfigurations.yuri-alpha.config.environment.systemPackages
+              );
+              hasSatelliteSystemdPackage = builtins.any (
+                pkg: builtins.match "xwayland-satellite-.*" pkg.name != null
+              ) self.nixosConfigurations.yuri-alpha.config.systemd.packages;
+              bashrc = ./dotfiles/bashrc;
+              emacsPackage = self.nixosConfigurations.yuri-alpha.config.home-manager.users.seryiza.programs.emacs.finalPackage;
+            }
+          );
         };
 
       nixosConfigurations."yuri-alpha" = nixpkgs.lib.nixosSystem {
@@ -145,6 +171,7 @@
           sysc-greet.nixosModules.default
           (import ./nixos/home/mango.nix { inherit mango; }).nixosModule
           (import ./nixos/home/river.nix).nixosModule
+          ewmModule.nixosModule
 
           home-manager.nixosModules.home-manager
           {

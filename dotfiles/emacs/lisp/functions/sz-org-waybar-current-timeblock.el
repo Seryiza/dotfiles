@@ -20,7 +20,8 @@
 
 (defun sz/org-status-publish-clock ()
   "Atomically publish the current Org clock heading."
-  (if-let ((snapshot (sz/org-status--clock-snapshot-file)))
+  (unless (and (fboundp 'ewm-running) (ewm-running))
+    (if-let ((snapshot (sz/org-status--clock-snapshot-file)))
       (condition-case err
           (let ((temporary (make-temp-file
                             (expand-file-name ".river-zelbar-status-org-clock."
@@ -34,7 +35,7 @@
               (when (file-exists-p temporary)
                 (delete-file temporary))))
         (error (message "Org clock snapshot: %s" (error-message-string err))))
-    (message "Org clock snapshot: XDG_RUNTIME_DIR is unavailable")))
+      (message "Org clock snapshot: XDG_RUNTIME_DIR is unavailable"))))
 
 (defun sz/org-status-delete-clock-snapshot ()
   "Delete the Org clock snapshot if it exists."
