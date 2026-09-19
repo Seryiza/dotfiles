@@ -2,6 +2,7 @@
 
 (require 'cl-lib)
 (require 'subr-x)
+(require 'tab-bar)
 
 (setq-default mode-line-percent-position nil)
 (setq-default mode-line-position-column-line-format '("(%l,%c)"))
@@ -73,12 +74,12 @@
       text)))
 
 (defun sz/ewm-mode-line--tabs ()
-  "Return the selected buffer's position in the window's native tab line."
-  (when (bound-and-true-p tab-line-mode)
-    (let* ((buffers (funcall tab-line-tabs-function))
-           (position (cl-position (window-buffer) buffers)))
+  "Return the current workspace's position in the frame's native tabs."
+  (when (bound-and-true-p tab-bar-mode)
+    (let* ((tabs (funcall tab-bar-tabs-function))
+           (position (cl-position 'current-tab tabs :key #'car)))
       (when position
-        (format "Tabs %d/%d" (1+ position) (length buffers))))))
+        (format "Tabs %d/%d" (1+ position) (length tabs))))))
 
 (defun sz/ewm-mode-line--narrow-audio (audio)
   "Keep AUDIO's meaningful warning on a narrow tile, if it has one."

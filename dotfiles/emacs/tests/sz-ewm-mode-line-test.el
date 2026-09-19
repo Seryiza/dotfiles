@@ -1,7 +1,7 @@
 ;;; sz-ewm-mode-line-test.el --- ERT checks for EWM mode-line placement -*- lexical-binding: t -*-
 
 (require 'ert)
-(require 'tab-line)
+(require 'tab-bar)
 (require 'battery)
 (require 'time)
 
@@ -22,28 +22,27 @@
 (load (expand-file-name "lisp/sz-mode-line.el" sz/ewm-mode-line-test-directory)
       nil 'nomessage t)
 
-(ert-deftest sz/ewm-mode-line-tabs-match-native-window-tabs ()
-  (let ((buffers (mapcar #'generate-new-buffer '("tab-one" "tab-two"))))
+(ert-deftest sz/ewm-mode-line-tabs-match-native-workspaces ()
+  (let ((buffers (mapcar #'generate-new-buffer '("tab-one" "tab-two")))
+        (saved-tabs (frame-parameter nil 'tabs))
+        (tab-bar-mode t))
     (unwind-protect
         (save-window-excursion
-          (dolist (buffer buffers)
-            (with-current-buffer buffer
-              (setq-local tab-line-tabs-function #'tab-line-tabs-fixed-window-buffers)
-              (tab-line-mode 1)))
+          (set-frame-parameter nil 'tabs nil)
           (switch-to-buffer (car buffers))
-          (set-window-prev-buffers nil nil)
-          (set-window-next-buffers nil nil)
-          (set-window-parameter nil 'tab-line-buffers nil)
           (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/1"))
+          (tab-new)
           (switch-to-buffer (cadr buffers))
           (should (equal (sz/ewm-mode-line--tabs) "Tabs 2/2"))
-          (tab-line-select-tab-buffer (car buffers) (selected-window))
-          (with-current-buffer (window-buffer)
-            (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/2"))
-            (kill-buffer (cadr buffers))
-            (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/1"))
-            (tab-line-mode -1)
+          (tab-previous)
+          (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/2"))
+          (kill-buffer (cadr buffers))
+          (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/2"))
+          (tab-close 2)
+          (should (equal (sz/ewm-mode-line--tabs) "Tabs 1/1"))
+          (let ((tab-bar-mode nil))
             (should-not (sz/ewm-mode-line--tabs))))
+      (set-frame-parameter nil 'tabs saved-tabs)
       (mapc (lambda (buffer) (when (buffer-live-p buffer) (kill-buffer buffer))) buffers))))
 
 (ert-deftest sz/ewm-mode-line-reorders-an-existing-clock-once ()

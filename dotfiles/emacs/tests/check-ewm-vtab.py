@@ -1,8 +1,10 @@
-"""Run the native tab-line crash regression on a disposable Xvfb display.
+"""Run vtab's native redisplay check on a disposable Xvfb display.
 
 Requires Emacs, Xvfb, and EWM_TEST_SOURCE pointing to pinned EWM lisp sources.
+EWM_TEST_ELPA may override the installed Consult/vtab package directory.
 """
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -16,13 +18,17 @@ try:
     assert display.isdecimal(), "Xvfb did not allocate an isolated display"
     env = dict(os.environ, DISPLAY=":" + display, GDK_BACKEND="x11", NO_AT_BRIDGE="1")
     env.pop("WAYLAND_DISPLAY", None)
+    elpa = os.environ.get("EWM_TEST_ELPA", str(Path.home() / ".local/share/emacs/elpa"))
+    packages = (f'(progn (require \'package) (setq package-user-dir {json.dumps(elpa)} '
+                'package-quickstart nil) (package-initialize))')
     result = subprocess.run(
-        ["emacs", "-Q", "--load", str(Path(__file__).with_name("sz-ewm-test.el")),
+        ["emacs", "-Q", "--eval", packages,
+         "--load", str(Path(__file__).with_name("sz-ewm-test.el")),
          "--eval", '(progn (unless (display-graphic-p) (kill-emacs 2)) '
          '(let ((noninteractive t)) (ert-run-tests-batch-and-exit '
-         '"sz/ewm-tab-line-truncated-isolate-native-redisplay")))'],
+         '"sz/ewm-vtab-native-redisplay")))'],
         env=env, timeout=45)
-    print(f"Native tab-line regression: exit {result.returncode}")
+    print(f"Native vtab redisplay: exit {result.returncode}")
     sys.exit(result.returncode if result.returncode >= 0 else 128 - result.returncode)
 finally:
     server.terminate()

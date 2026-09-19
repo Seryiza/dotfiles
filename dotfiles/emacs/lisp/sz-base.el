@@ -245,53 +245,15 @@
   (load user-init-file nil t t)   ; noerror=nil, nomessage=t, nosuffix=t
   (message "Reloaded %s" user-init-file))
 
-(defun sz/current-tab-index ()
-  "Return the zero-based index of the current tab."
-  (seq-position (funcall tab-bar-tabs-function)
-                'current-tab
-                (lambda (tab marker)
-                  (eq (car tab) marker))))
-
-(defun sz/tab-next-no-wrap ()
-  "Switch to the next tab without wrapping.
-Return non-nil when a tab was selected."
-  (let* ((tabs (funcall tab-bar-tabs-function))
-         (index (sz/current-tab-index)))
-    (when (and index (< index (1- (length tabs))))
-      (tab-bar-select-tab (+ index 2))
-      t)))
-
-(defun sz/tab-previous-no-wrap ()
-  "Switch to the previous tab without wrapping.
-Return non-nil when a tab was selected."
-  (let ((index (sz/current-tab-index)))
-    (when (and index (> index 0))
-      (tab-bar-select-tab index)
-      t)))
-
 (defun sz/move-or-switch-tab (direction)
   "Move to window in DIRECTION, or switch tabs when none exists.
 An active minibuffer counts as a window target so the movement keys
-can move focus back to minibuffer input.  Tab switching does not wrap
-from the last tab to the first, or from the first tab to the last.
-Return non-nil when Emacs handled the movement."
+can move focus back to minibuffer input.  Tab switching wraps around."
   (let ((target (window-in-direction direction)))
     (cond
-     (target
-      (select-window target)
-      t)
-     ((memq direction '(right below))
-      (sz/tab-next-no-wrap))
-     (t
-      (sz/tab-previous-no-wrap)))))
-
-(defun sz/below-or-tab-next ()
-  (interactive)
-  (sz/move-or-switch-tab 'below))
-
-(defun sz/above-or-tab-previous ()
-  (interactive)
-  (sz/move-or-switch-tab 'above))
+     (target (select-window target))
+     ((memq direction '(right below)) (tab-next))
+     (t (tab-previous)))))
 
 (defun sz/left-or-tab-previous ()
   (interactive)
@@ -434,12 +396,6 @@ Return non-nil when Emacs handled the movement."
   (setq show-paren-delay 0)
   (show-paren-mode 1)
   (global-eldoc-mode -1)
-
-  ;; (setq tab-bar-auto-width t)
-  ;; (setq tab-bar-auto-width-max '(200 16))
-  ;; (setq tab-bar-close-button-show nil)
-  ;; (setq tab-bar-tab-hints nil)
-  ;; (setq tab-bar-format '(tab-bar-format-tabs tab-bar-separator))
 
   (setopt treesit-language-source-alist
           '((css "https://github.com/tree-sitter/tree-sitter-css")
@@ -724,15 +680,19 @@ Return non-nil when Emacs handled the movement."
   (("M-h" . sz/left-or-tab-previous)
    ("M-j" . windmove-down)
    ("M-k" . windmove-up)
-   ("M-l" . sz/right-or-tab-next)
-   ("M-n" . tab-new)
-   ("M-u" . tab-close))
+   ("M-l" . sz/right-or-tab-next)))
 
+(use-package vtab
+  :vc (:url "https://github.com/mugen-void/vtab")
+  :demand t
+  :catch nil
+  :custom
+  (tab-bar-close-last-tab-choice nil)
   :config
-  (tab-bar-mode -1)
-  (setq tab-bar-close-button-show nil)
-  (setq tab-bar-new-tab-choice "*scratch*")
-  (setq tab-bar-format '(tab-bar-format-tabs tab-bar-separator)))
+  ;; Keep the Consult/search prefix; EWM supplies intercepted Super bindings.
+  (keymap-unset vtab-mode-map "M-s")
+  (global-tab-line-mode -1)
+  (unless vtab-mode (vtab-mode 1)))
 
 (use-package all-the-icons
   :ensure t

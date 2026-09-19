@@ -1,7 +1,7 @@
 ;;; sz-ewm.el --- Minimal EWM session integration -*- lexical-binding: t -*-
 
 (require 'use-package)
-(require 'tab-line)
+(require 'tab-bar)
 
 (defgroup sz/ewm nil
   "Personal EWM session integration."
@@ -103,6 +103,30 @@ Use the identity reported by `ewm-list-outputs'."
   (interactive)
   (select-window (split-window-right)))
 
+(defun sz/ewm-consult-app (&optional new-tab)
+  "Preview an EWM app in the current window, or a new tab with NEW-TAB.
+Create the tab only after confirmation; the previous buffer stays alive."
+  (interactive)
+  (require 'consult)
+  (let* ((switch-to-buffer-obey-display-actions nil)
+         (apps (seq-filter #'ewm-surface-buffer-p (buffer-list))))
+    (unless apps (user-error "No running EWM applications"))
+    (let ((buffer (get-buffer
+                   (consult--read (mapcar #'buffer-name apps)
+                                  :prompt "EWM application: "
+                                  :category 'buffer :require-match t :sort nil
+                                  :state (consult--buffer-preview)))))
+      (unless (and (buffer-live-p buffer) (ewm-surface-buffer-p buffer))
+        (user-error "Application is no longer running"))
+      (if new-tab
+          (switch-to-buffer-other-tab buffer)
+        (switch-to-buffer buffer nil t)))))
+
+(defun sz/ewm-consult-app-new-tab ()
+  "Select a running EWM app in a newly created tab."
+  (interactive)
+  (sz/ewm-consult-app t))
+
 (defun sz/ewm--dispatch-in-selected-buffer (function &rest args)
   "Run intercepted FUNCTION with ARGS in the selected window's buffer."
   ;; EWM's async callback can retain a different current buffer after focus moves.
@@ -110,21 +134,6 @@ Use the identity reported by `ewm-list-outputs'."
     ;; These are keyboard commands, not a replay of the last mouse event.
     (let ((last-nonmenu-event nil))
       (apply function args))))
-
-(defun sz/ewm-tab-line-setup ()
-  "Enable ordinary Emacs buffer tabs throughout the EWM session."
-  (when (bound-and-true-p ewm-mode)
-    ;; Emacs 30.2 aborts measuring truncated bidi isolates with boxed faces.
-    ;; ponytail: LTR width measurement until the upstream bidi bug is fixed.
-    (with-current-buffer tab-line-auto-hscroll-buffer
-      (setq-local bidi-display-reordering nil))
-    (setq-default tab-line-tabs-function #'tab-line-tabs-fixed-window-buffers
-                  tab-line-switch-cycling nil
-                  tab-line-close-button-show nil
-                  tab-line-new-button-show nil
-                  tab-line-tab-name-function #'tab-line-tab-name-truncated-buffer
-                  tab-line-tab-name-truncated-max 50)
-    (global-tab-line-mode 1)))
 
 (defun sz/ewm-apply-profile ()
   "Send the configured EWM profile without restarting its compositor."
@@ -140,7 +149,6 @@ Use the identity reported by `ewm-list-outputs'."
   :catch nil
   ;; The Nix session loads EWM after personal init; ordinary Emacs stays deferred.
   :defer t
-  :hook (ewm-mode . sz/ewm-tab-line-setup)
   :bind (:map ewm-mode-map
              ("<f13>" . meow-keypad)
              ;; XKB inet maps xremap's KEY_F13 to XF86Tools (PGTK: Tools).
@@ -150,27 +158,27 @@ Use the identity reported by `ewm-list-outputs'."
              ("s-b" . (lambda () (interactive) (sz/ewm--start "firefox" "firefox")))
              ("S-s-b" . (lambda () (interactive) (sz/ewm--start "run-work-browser" "run-work-browser")))
              ("M-s-e" . sz/ewm-launch-enpass)
-             ("s-m" . ewm-frame-new)
-             ("M-s-," . ewm-frame-new)
-             ("M-s-." . ewm-frame-new)
-             ("s-w" . ewm-frame-close)
              ("s-;" . sz/ewm-org-capture)
              ("s-<escape>" . sz/ewm-lock)
              ("S-s-e" . sz/ewm-logout)
              ("s-<f8>" . sz/ewm-power-saver)
              ("S-s-<f8>" . sz/ewm-power-balanced)
-             ("s-," . ewm-frame-right)
-             ("s-." . ewm-frame-left)
              ("s-h" . ewm-focus-left)
              ("s-l" . ewm-focus-right)
              ("M-s-l" . sz/ewm-split-right)
-             ("s-k" . tab-line-switch-to-prev-tab)
-             ("s-j" . tab-line-switch-to-next-tab)
-             ("s-<tab>" . tab-line-switch-to-next-tab)
-             ("S-s-<tab>" . tab-line-switch-to-prev-tab)
-             ("s-<iso-lefttab>" . tab-line-switch-to-prev-tab)
+             ("s-i" . sz/ewm-consult-app)
+             ("M-s-i" . sz/ewm-consult-app-new-tab)
+             ("s-m" . scratch-buffer)
+             ("s-t" . tab-new)
+             ("s-'" . bury-buffer)
+             ("s-k" . tab-previous)
+             ("s-j" . tab-next)
+             ("s-<tab>" . tab-next)
+             ("S-s-<tab>" . tab-previous)
+             ("s-<iso-lefttab>" . tab-previous)
              ("s-f" . ewm-toggle-fullscreen)
-             ("s-u" . kill-current-buffer)
+             ("s-u" . tab-close)
+             ("M-s-u" . kill-current-buffer)
              ("C-S-s-r" . sz/ewm-apply-profile)
              ("<Print>" . sz/ewm-screenshot-region-copy)
              ("C-<Print>" . sz/ewm-screenshot-region)
@@ -200,7 +208,9 @@ Use the identity reported by `ewm-list-outputs'."
                :xkb-options "grp:ctrl_space_toggle,custom:types,custom:positional-latin-shortcuts")
      (touchpad :tap t :tap-button-map "left-right-middle"
                :natural-scroll t :dwt t :middle-emulation t))
-   ewm-intercept-prefixes '("M-:" "M-x")
+   ;; Meta bindings live under ESC in the keymap, beyond the top-level scan.
+   ewm-intercept-prefixes '("M-:" "M-x" ("M-s-u" :fullscreen)
+                           ("M-s-i" :fullscreen))
    ;; Do not turn Super-c/v into Ctrl-c/v: terminal Ctrl-c is SIGINT, not copy.
    ewm-surface-emulate-keys nil
    confirm-kill-emacs #'yes-or-no-p)
@@ -215,6 +225,11 @@ Use the identity reported by `ewm-list-outputs'."
 
 ;; Run after :bind has populated the keymap, including when EWM is already loaded.
 (with-eval-after-load 'ewm
+  ;; Use tab-bar workspaces in one frame; clear upstream frame bindings.
+  (dolist (key '("M-s-," "M-s-." "s-w" "s-," "s-."
+                 "S-s-<left>" "S-s-<right>" "C-s-<left>" "C-s-<right>"
+                 "s-1" "s-2" "s-3" "s-4" "s-5" "s-6" "s-7" "s-8" "s-9"))
+    (define-key ewm-mode-map (kbd key) nil))
   ;; Keep active EWM bindings available even when a client is fullscreen.
   (map-keymap
    (lambda (key binding)
