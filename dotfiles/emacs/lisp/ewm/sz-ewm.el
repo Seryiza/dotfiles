@@ -2,6 +2,7 @@
 
 (require 'use-package)
 (require 'tab-bar)
+(require 'cl-lib)
 
 (defgroup sz/ewm nil
   "Personal EWM session integration."
@@ -129,6 +130,37 @@ Create the tab only after confirmation; the previous buffer stays alive."
     (let ((last-nonmenu-event nil))
       (apply function args))))
 
+(defun sz/ewm--close-owned-tabs ()
+  "Close tabs owned by the dying EWM buffer, keeping each frame's last tab."
+  (let ((buffer (current-buffer)))
+    (dolist (frame (frame-list))
+      (with-selected-frame frame
+        (let ((tabs (frame-parameter frame 'tabs)))
+          ;; Descending positions stay valid when earlier iterations close tabs.
+          (cl-loop for tab in (reverse tabs)
+                   for index downfrom (length tabs)
+                   when (eq (alist-get 'sz/ewm-owner tab) buffer)
+                   do (setf (alist-get 'sz/ewm-owner (cdr tab)) nil)
+                   and do (when (cdr (frame-parameter frame 'tabs))
+                            (tab-bar-close-tab index))))))))
+
+(defun sz/ewm--display-in-owned-tab (buffer alist)
+  "Display BUFFER in a new tab owned by it, using display action ALIST."
+  (prog1 (display-buffer-in-new-tab buffer alist)
+    (setf (alist-get 'sz/ewm-owner (cdr (assq 'current-tab (tab-bar-tabs)))) buffer)
+    (with-current-buffer buffer
+      ;; EWM runs this only after the client actually closes, not on a request.
+      (add-hook 'kill-buffer-hook #'sz/ewm--close-owned-tabs nil t))))
+
+(defun sz/ewm--place-in-new-tab (function buffer floating &rest args)
+  "Place newly mapped tiled BUFFER in a new tab; preserve FLOATING placement."
+  ;; Scope the rule to initial placement, not selection of an existing app.
+  (let ((display-buffer-alist
+         (if floating display-buffer-alist
+           (cons `(,(ewm-surface-match) sz/ewm--display-in-owned-tab)
+                 display-buffer-alist))))
+    (apply function buffer floating args)))
+
 (defun sz/ewm-apply-profile ()
   "Send the configured EWM profile without restarting its compositor."
   (interactive)
@@ -190,6 +222,7 @@ Create the tab only after confirmation; the previous buffer stays alive."
   (setf (alist-get 'fullscreen pop-up-frame-alist) nil)
   (advice-add 'ewm--handle-intercepted-command :around
               #'sz/ewm--dispatch-in-selected-buffer)
+  (advice-add 'ewm--place-surface-buffer :around #'sz/ewm--place-in-new-tab)
   (setq-default
    ;; Keep the River-like static, opaque desktop and persistent pointer.
    ewm-animations-enabled nil
