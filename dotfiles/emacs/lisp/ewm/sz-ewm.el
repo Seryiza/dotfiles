@@ -198,6 +198,8 @@ Create the tab only after confirmation; the previous buffer stays alive."
              ("s-'" . bury-buffer)
              ("s-k" . tab-previous)
              ("s-j" . tab-next)
+             ("M-s-j" . tab-bar-move-tab)
+             ("M-s-k" . tab-bar-move-tab-backward)
              ("s-<tab>" . tab-next)
              ("S-s-<tab>" . tab-previous)
              ("s-<iso-lefttab>" . tab-previous)
@@ -236,7 +238,8 @@ Create the tab only after confirmation; the previous buffer stays alive."
                :natural-scroll t :dwt t :middle-emulation t))
    ;; Meta bindings live under ESC in the keymap, beyond the top-level scan.
    ewm-intercept-prefixes '("M-:" "M-x" ("M-s-u" :fullscreen)
-                           ("M-s-i" :fullscreen))
+                           ("M-s-i" :fullscreen)
+                           ("M-s-j" :fullscreen) ("M-s-k" :fullscreen))
    ;; Do not turn Super-c/v into Ctrl-c/v: terminal Ctrl-c is SIGINT, not copy.
    ewm-surface-emulate-keys nil
    confirm-kill-emacs #'yes-or-no-p)

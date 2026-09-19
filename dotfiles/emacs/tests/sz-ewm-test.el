@@ -141,7 +141,7 @@
                               (equal (plist-get spec :description) description))
                             sent)))
     (dolist (description '("s-f" "s-u" "M-s-u" "s-<escape>" "S-s-e" "s-<f8>" "S-s-<f8>" "s-;"
-                           "s-i" "M-s-i" "s-m" "s-n" "s-'" "s-j" "s-k"
+                           "s-i" "M-s-i" "s-m" "s-n" "s-'" "s-j" "s-k" "M-s-j" "M-s-k"
                            "s-<tab>" "S-s-<tab>" "s-<iso-lefttab>"
                            "<Print>" "C-<Print>" "S-<Print>"
                            "<MonBrightnessUp>" "<MonBrightnessDown>"
@@ -159,6 +159,25 @@
         (if (member (plist-get spec :description) '("M-:" "M-x"))
             (should (eq (plist-get spec :fullscreen) :false))
           (should (eq (plist-get spec :fullscreen) t)))))))
+
+(ert-deftest sz/ewm-move-tab-keys-reorder-current-tab ()
+  (sz/ewm-test-with-tabs
+    (tab-bar-rename-tab "first")
+    (tab-new)
+    (tab-bar-rename-tab "second")
+    (tab-new)
+    (tab-bar-rename-tab "third")
+    (tab-bar-select-tab 2)
+    (let ((window (selected-window)))
+      (dolist (step '(("M-s-j" ("first" "third" "second") 2)
+                      ("M-s-k" ("first" "second" "third") 1)
+                      ("M-s-k" ("second" "first" "third") 0)))
+        (ewm--handle-event `((event . "intercepted-command") (key . ,(car step))))
+        (should (equal (vtab--get-tabs) (cadr step)))
+        (should (= (vtab--current-tab-index) (caddr step)))
+        (should (eq (selected-window) window))
+        (should (equal (frame-parameter nil 'vtab--tab-state)
+                       (cons (caddr step) (cadr step))))))))
 
 (ert-deftest sz/ewm-super-tap-tools-event-opens-keypad ()
   ;; evdev's KEY_F13 becomes XF86Tools under the standard XKB inet mapping;

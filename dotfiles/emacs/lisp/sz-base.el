@@ -693,6 +693,8 @@ can move focus back to minibuffer input.  Tab switching wraps around."
   :config
   ;; Keep the Consult/search prefix; EWM supplies intercepted Super bindings.
   (keymap-unset vtab-mode-map "M-s")
+  ;; Reordering tabs does not run vtab's selection or buffer-change hooks.
+  (advice-add 'tab-bar-move-tab-to :after #'vtab--on-buffer-change)
   (global-tab-line-mode -1)
   (unless vtab-mode (vtab-mode 1)))
 
