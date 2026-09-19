@@ -161,7 +161,9 @@ in
     pkgs.nautilus
     pkgs.exercism
     unstable-pkgs.ollama
-    unstable-pkgs.llama-cpp
+    (unstable-pkgs.llama-cpp.override {
+      nodejs_latest = pkgs.nodejs;
+    })
     pkgs.gnome-font-viewer
     pkgs.pnpm
     pkgs.epiphany
