@@ -688,6 +688,7 @@ can move focus back to minibuffer input.  Tab switching wraps around."
   :catch nil
   :custom
   (tab-bar-close-last-tab-choice nil)
+  (vtab-window-width 40)
   :config
   ;; Keep the Consult/search prefix; EWM supplies intercepted Super bindings.
   (keymap-unset vtab-mode-map "M-s")
