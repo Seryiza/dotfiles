@@ -48,19 +48,14 @@
       keybindings =
         let modifier = config.wayland.windowManager.sway.config.modifier;
         in lib.mkOptionDefault {
-          "${modifier}+h" = lib.mkForce "exec sway-smart-focus left";
-          "${modifier}+j" = lib.mkForce "exec sway-smart-focus down";
-          "${modifier}+k" = lib.mkForce "exec sway-smart-focus up";
-          "${modifier}+l" = lib.mkForce "exec sway-smart-focus right";
           "${modifier}+Alt+h" = "workspace prev";
           "${modifier}+Alt+l" = "workspace next";
           "${modifier}+Return" = "exec alacritty";
           "${modifier}+Escape" = "exec swaylock -c 000000";
           "${modifier}+Shift+e" = lib.mkForce "exec uwsm stop";
-          "${modifier}+u" = lib.mkForce "exec sway-smart-close";
+          "${modifier}+u" = "kill";
           "${modifier}+n" = ''exec wmenu-run -i -b -l 10 -f "Iosevka 14"'';
           "${modifier}+Alt+n" = ''exec wmenu-run -i -b -l 10 -f "Iosevka 14"'';
-          "${modifier}+m" = lib.mkForce "exec sway-smart-open";
           "${modifier}+Alt+m" = lib.mkForce "exec emacsclient -c";
           "${modifier}+Shift+b" = "exec run-work-browser";
           "${modifier}+Alt+space" = "sticky toggle";

@@ -285,12 +285,6 @@ Return non-nil when Emacs handled the movement."
      (t
       (sz/tab-previous-no-wrap)))))
 
-(defun sz/sway-nav (direction)
-  "Handle Sway-dispatched directional navigation inside Emacs.
-Return non-nil when Emacs moved to another window or non-wrapping tab.
-Return nil when Sway should fall back to its own directional focus."
-  (sz/move-or-switch-tab direction))
-
 (defun sz/below-or-tab-next ()
   (interactive)
   (sz/move-or-switch-tab 'below))
@@ -306,24 +300,6 @@ Return nil when Sway should fall back to its own directional focus."
 (defun sz/right-or-tab-next ()
   (interactive)
   (sz/move-or-switch-tab 'right))
-
-(defun sz/sway-new-tab ()
-  "Handle Sway-dispatched new-Emacs action inside Emacs.
-Open a new tab in the current frame.  Return non-nil when Emacs
-handled the request."
-  (tab-new)
-  t)
-
-(defun sz/sway-close ()
-  "Handle Sway-dispatched close action inside Emacs.
-Close the current tab when more than one tab exists in the selected
-frame.  When this is the frame's only tab, close the selected frame
-instead.  Return non-nil when Emacs handled the close request."
-  (let ((tabs (funcall tab-bar-tabs-function)))
-    (if (> (length tabs) 1)
-        (tab-close)
-      (delete-frame nil t)))
-  t)
 
 ;; === Packages
 

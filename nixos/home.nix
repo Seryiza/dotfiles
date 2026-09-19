@@ -112,24 +112,6 @@ in {
       force = true;
     };
 
-    ".local/bin/sway-smart-focus" = {
-      source = ../scripts/sway-smart-focus;
-      executable = true;
-      force = true;
-    };
-
-    ".local/bin/sway-smart-close" = {
-      source = ../scripts/sway-smart-close;
-      executable = true;
-      force = true;
-    };
-
-    ".local/bin/sway-smart-open" = {
-      source = ../scripts/sway-smart-open;
-      executable = true;
-      force = true;
-    };
-
     ".local/bin/increase-current-volume" = {
       source = ../scripts/increase-current-volume;
       executable = true;
