@@ -20,11 +20,7 @@
   (load custom-file nil 'nomessage t))
 
 (add-to-list 'load-path (locate-user-emacs-file "lisp"))
-(use-package sz-ewm
-  :ensure nil
-  :catch nil
-  :load-path "lisp/ewm"
-  :demand t)
+(add-to-list 'load-path (locate-user-emacs-file "lisp/ewm"))
 
 (let* ((dir (locate-user-emacs-file "lisp"))
        (functions-dir (expand-file-name "functions" dir))
@@ -35,7 +31,8 @@
           "sz-org-waybar-current-timeblock.el"
           "sz-telega-capture-message-to-inbox.el"
           "sz-telega-save-msg-media.el"))
-       (files '("sz-base.el"
+       (files '("ewm/sz-ewm.el"
+                "sz-base.el"
                 "sz-theme.el"
                 "sz-meow.el"
                 "sz-eat.el"
