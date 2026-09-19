@@ -148,7 +148,7 @@ Create the tab only after confirmation; the previous buffer stays alive."
              ;; XKB inet maps xremap's KEY_F13 to XF86Tools (PGTK: Tools).
              ("<Tools>" . meow-keypad)
              ("s-y" . (lambda () (interactive) (sz/ewm--start "ghostty" "ghostty" "+new-window")))
-             ("s-n" . (lambda () (interactive) (sz/ewm--start "wmenu-run" "wmenu-run" "-i" "-b" "-l" "10" "-f" "Iosevka 14")))
+             ("s-m" . (lambda () (interactive) (sz/ewm--start "wmenu-run" "wmenu-run" "-i" "-b" "-l" "10" "-f" "Iosevka 14")))
              ("s-b" . (lambda () (interactive) (sz/ewm--start "firefox" "firefox")))
              ("S-s-b" . (lambda () (interactive) (sz/ewm--start "run-work-browser" "run-work-browser")))
              ("M-s-e" . sz/ewm-launch-enpass)
@@ -162,8 +162,7 @@ Create the tab only after confirmation; the previous buffer stays alive."
              ("M-s-l" . sz/ewm-split-right)
              ("s-i" . sz/ewm-consult-app)
              ("M-s-i" . sz/ewm-consult-app-new-tab)
-             ("s-m" . scratch-buffer)
-             ("s-t" . tab-new)
+             ("s-n" . tab-new)
              ("s-'" . bury-buffer)
              ("s-k" . tab-previous)
              ("s-j" . tab-next)
@@ -220,7 +219,7 @@ Create the tab only after confirmation; the previous buffer stays alive."
 ;; Run after :bind has populated the keymap, including when EWM is already loaded.
 (with-eval-after-load 'ewm
   ;; Use tab-bar workspaces in one frame; clear upstream frame bindings.
-  (dolist (key '("M-s-," "M-s-." "s-w" "s-," "s-."
+  (dolist (key '("s-t" "M-s-," "M-s-." "s-w" "s-," "s-."
                  "S-s-<left>" "S-s-<right>" "C-s-<left>" "C-s-<right>"
                  "s-1" "s-2" "s-3" "s-4" "s-5" "s-6" "s-7" "s-8" "s-9"))
     (define-key ewm-mode-map (kbd key) nil))

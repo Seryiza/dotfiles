@@ -108,13 +108,12 @@
     (should (eq (lookup-key ewm-mode-map (kbd "M-s-l")) #'sz/ewm-split-right))
     (should (eq (lookup-key ewm-mode-map (kbd "s-j")) #'tab-next))
     (should (eq (lookup-key ewm-mode-map (kbd "s-k")) #'tab-previous))
-    (should (eq (lookup-key ewm-mode-map (kbd "s-t")) #'tab-new))
+    (should (eq (lookup-key ewm-mode-map (kbd "s-n")) #'tab-new))
     (should (eq (lookup-key ewm-mode-map (kbd "s-'")) #'bury-buffer))
     (should (eq (lookup-key ewm-mode-map (kbd "s-u")) #'tab-close))
     (should (eq (lookup-key ewm-mode-map (kbd "M-s-u")) #'kill-current-buffer))
     (should (eq (lookup-key ewm-mode-map (kbd "s-i")) #'sz/ewm-consult-app))
     (should (eq (lookup-key ewm-mode-map (kbd "M-s-i")) #'sz/ewm-consult-app-new-tab))
-    (should (eq (lookup-key ewm-mode-map (kbd "s-m")) #'scratch-buffer))
     (should (eq (lookup-key ewm-mode-map (kbd "s-;")) #'org-capture))
     (should (eq (lookup-key global-map (kbd "M-:")) #'eval-expression))
     (should (eq (lookup-key ewm-mode-map (kbd "S-s-e")) #'sz/ewm-logout))
@@ -123,7 +122,7 @@
     (cl-letf (((symbol-function 'ewm-intercept-keys-module)
                (lambda (specs) (setq sent specs))))
       (ewm--send-intercept-keys))
-    (dolist (key '("M-s-," "M-s-." "s-w" "s-," "s-."
+    (dolist (key '("s-t" "M-s-," "M-s-." "s-w" "s-," "s-."
                    "S-s-<left>" "S-s-<right>" "C-s-<left>" "C-s-<right>"
                    "s-1" "s-2" "s-3" "s-4" "s-5" "s-6" "s-7" "s-8" "s-9"))
       (should-not (lookup-key ewm-mode-map (kbd key)))
@@ -142,7 +141,7 @@
                               (equal (plist-get spec :description) description))
                             sent)))
     (dolist (description '("s-f" "s-u" "M-s-u" "s-<escape>" "S-s-e" "s-<f8>" "S-s-<f8>" "s-;"
-                           "s-i" "M-s-i" "s-m" "s-t" "s-'" "s-j" "s-k"
+                           "s-i" "M-s-i" "s-m" "s-n" "s-'" "s-j" "s-k"
                            "s-<tab>" "S-s-<tab>" "s-<iso-lefttab>"
                            "<Print>" "C-<Print>" "S-<Print>"
                            "<MonBrightnessUp>" "<MonBrightnessDown>"
@@ -199,7 +198,7 @@
                      (puthash id buffer ewm--surfaces)))
           (switch-to-buffer (car buffers))
           (dolist (buffer (cdr buffers))
-            (ewm--handle-event '((event . "intercepted-command") (key . "s-t")))
+            (ewm--handle-event '((event . "intercepted-command") (key . "s-n")))
             (should (eq (window-buffer) (get-buffer "*scratch*")))
             (switch-to-buffer buffer))
           (tab-bar-select-tab 1)
@@ -347,16 +346,13 @@
         (should (buffer-live-p buffer))
         (kill-buffer buffer)))))
 
-(ert-deftest sz/ewm-scratch-key-reuses-buffer-in-current-tab ()
-  (let ((editor (generate-new-buffer "ewm-scratch-test.org")))
-    (unwind-protect
-        (sz/ewm-test-with-tabs
-          (switch-to-buffer editor)
-          (dotimes (_ 2)
-            (ewm--handle-event '((event . "intercepted-command") (key . "s-m")))
-            (should (eq (window-buffer) (get-buffer "*scratch*")))
-            (should (= 1 (length (tab-bar-tabs))))))
-      (kill-buffer editor))))
+(ert-deftest sz/ewm-launcher-key-opens-wmenu ()
+  (let (started)
+    (cl-letf (((symbol-function 'sz/ewm--start)
+               (lambda (&rest args) (setq started args))))
+      (ewm--handle-event '((event . "intercepted-command") (key . "s-m")))
+      (should (equal started '("wmenu-run" "wmenu-run" "-i" "-b" "-l" "10"
+                              "-f" "Iosevka 14"))))))
 
 (ert-deftest sz/ewm-vtab-layout-includes-sidebar-and-selected-surface ()
   (let ((ewm--surfaces (make-hash-table :test #'eql)))
