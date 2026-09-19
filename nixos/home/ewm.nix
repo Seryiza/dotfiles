@@ -3,9 +3,21 @@
   nixosModule =
     { config, pkgs, ... }:
     let
-      ewmPackage = pkgs.callPackage "${ewm}/nix/default.nix" {
+      ewmPackage = (pkgs.callPackage "${ewm}/nix/default.nix" {
         emacsPackage = pkgs.emacs-pgtk;
-      };
+      }).overrideAttrs (old: {
+        packageRequires = map (dependency:
+          if dependency.pname == "ewm-core" then
+            dependency.overrideAttrs (core: {
+              patches = (core.patches or [ ]) ++ [ ../pkgs/ewm-preserve-xkb-layout.patch ];
+              doCheck = true;
+              cargoTestFlags = [ "--test" "input_hotpath_integration" ];
+              # The compositor's capture/intercept state is process-global.
+              checkFlags = [ "--test-threads=1" ];
+            })
+          else dependency
+        ) old.packageRequires;
+      });
     in
     {
       imports = [ "${ewm}/nix/service.nix" ];

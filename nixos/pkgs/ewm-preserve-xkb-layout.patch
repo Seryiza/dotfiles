@@ -1,0 +1,130 @@
+Keep the real XKB group while Emacs captures keyboard input. Latin shortcut
+matching already uses raw_latin_sym_or_raw_current_sym; changing the live group
+around input_intercept undoes group-switch actions such as Ctrl+Space.
+
+diff --git a/src/input.rs b/src/input.rs
+--- a/src/input.rs
++++ b/src/input.rs
+@@ -392,16 +392,5 @@
+-    // During keyboard capture, Emacs needs Latin keysyms for keybinding
+-    // dispatch. Temporarily set base layout for this key event, then restore
+-    // immediately after. No persistent state needed.
+-    let prefix_saved_layout =
+-        if module::get_keyboard_capture() && focus_on_emacs && state.ewm.xkb_current_layout != 0 {
+-            let saved = state.ewm.xkb_current_layout;
+-            keyboard.with_xkb_state(state, |mut context| {
+-                context.set_layout(smithay::input::keyboard::Layout(0));
+-            });
+-            Some(saved)
+-        } else {
+-            None
+-        };
++    // Match shortcuts through raw Latin keysyms below, without changing the
++    // live XKB group: this event may itself switch layouts during capture.
+-
++
+     let intercepted_keys = crate::module::get_intercepted_keys();
+     let focused_surface_id = state.ewm.focused_surface_id();
+@@ -437,9 +426,4 @@
+-    if let Some(saved) = prefix_saved_layout {
+-        keyboard.with_xkb_state(state, |mut context| {
+-            context.set_layout(smithay::input::keyboard::Layout(saved as u32));
+-        });
+-    }
+-
++
+     match action {
+         KeyAction::Forward => {
+             state.sync_keyboard_focus();
+diff --git a/tests/input_hotpath_integration.rs b/tests/input_hotpath_integration.rs
+--- a/tests/input_hotpath_integration.rs
++++ b/tests/input_hotpath_integration.rs
+@@ -470,2 +470,70 @@
+         .bindings(&[]);
+ }
++
++#[test]
++fn layout_switch_survives_keyboard_capture_and_key_release() {
++    use ewm_core::input::{DeviceType, InputConfigEntry};
++
++    const KEY_SPACE: u32 = 57 + 8;
++
++    for capture in [false, true] {
++        let mut h = Harness::new();
++        h.focus(if capture {
++            FocusMode::EmbeddedApp
++        } else {
++            FocusMode::EmacsBuffer
++        });
++        h.fix.configure_input(vec![InputConfigEntry {
++            device_type: Some(DeviceType::Keyboard),
++            xkb_layouts: Some("us,ru".into()),
++            xkb_options: Some("grp:ctrl_space_toggle".into()),
++            ..Default::default()
++        }]);
++        h.chord(KEY_LEFTCTRL, KEY_SPACE, KeyboardAction::Forward);
++        assert_eq!(h.fix.ewm_ref().xkb_current_layout, 1);
++        if capture {
++            h.bindings(&[META_X])
++                .chord(KEY_LEFTALT, KEY_X, KeyboardAction::RedirectToEmacs)
++                .expect_capture(true)
++                .expect_keyboard_focus(Target::Emacs);
++        }
++        h.pump();
++        h.emacs.drain_events();
++        h.fix.enable_event_capture();
++
++        // Plain typing must preserve Russian before and after switching.
++        h.tap(KEY_A, KeyboardAction::Forward);
++        assert_eq!(h.fix.ewm_ref().xkb_current_layout, 1);
++        for expected in [0, 1, 0] {
++            h.chord(KEY_LEFTCTRL, KEY_SPACE, KeyboardAction::Forward);
++            assert_eq!(
++                h.fix.ewm_ref().xkb_current_layout, expected,
++                "Ctrl+Space was undone with capture={capture}",
++            );
++            h.tap(KEY_A, KeyboardAction::Forward);
++            assert_eq!(h.fix.ewm_ref().xkb_current_layout, expected);
++            h.pump();
++            let groups: Vec<_> = h
++                .emacs
++                .drain_events()
++                .into_iter()
++                .filter_map(|event| match event {
++                    ClientEvent::KeyboardModifiers { group, .. } => Some(group),
++                    _ => None,
++                })
++                .collect();
++            assert_eq!(groups.last().copied(), Some(expected as u32));
++            let layouts: Vec<_> = h
++                .fix
++                .drain_events()
++                .into_iter()
++                .filter_map(|event| match event {
++                    ewm_core::event::Event::LayoutSwitched { index, .. } => Some(index),
++                    _ => None,
++                })
++                .collect();
++            assert_eq!(layouts, vec![expected]);
++        }
++        h.clear_capture();
++    }
++}
+diff --git a/src/testing/fixture.rs b/src/testing/fixture.rs
+--- a/src/testing/fixture.rs
++++ b/src/testing/fixture.rs
+@@ -534,8 +534,13 @@
+     pub fn set_intercepted_keys(&mut self, keys: Vec<crate::InterceptedKey>) {
+         crate::module::set_intercepted_keys_for_test(keys);
+     }
+-
++
++    pub fn configure_input(&mut self, configs: Vec<crate::input::InputConfigEntry>) {
++        self.state
++            .handle_module_command(crate::module::ModuleCommand::ConfigureInput { configs });
++    }
++
+     pub fn clear_keyboard_capture(&mut self) {
+         crate::module::clear_keyboard_capture_holders();
+         self.state.sync_keyboard_focus();
+     }

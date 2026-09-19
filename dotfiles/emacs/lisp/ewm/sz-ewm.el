@@ -40,12 +40,6 @@ Use the identity reported by `ewm-list-outputs'."
   "Start fixed shell COMMAND under process NAME."
   (start-process-shell-command name nil command))
 
-(defun sz/ewm-org-capture ()
-  "Select the English XKB layout before opening the capture menu."
-  (interactive)
-  (ewm-switch-layout-module "us")
-  (call-interactively #'org-capture))
-
 (defun sz/ewm-lock ()
   "Lock the current session with the existing swaylock policy."
   (interactive)
@@ -158,7 +152,7 @@ Create the tab only after confirmation; the previous buffer stays alive."
              ("s-b" . (lambda () (interactive) (sz/ewm--start "firefox" "firefox")))
              ("S-s-b" . (lambda () (interactive) (sz/ewm--start "run-work-browser" "run-work-browser")))
              ("M-s-e" . sz/ewm-launch-enpass)
-             ("s-;" . sz/ewm-org-capture)
+             ("s-;" . org-capture)
              ("s-<escape>" . sz/ewm-lock)
              ("S-s-e" . sz/ewm-logout)
              ("s-<f8>" . sz/ewm-power-saver)
