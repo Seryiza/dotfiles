@@ -545,6 +545,7 @@ can move focus back to minibuffer input.  Tab switching wraps around."
   :custom
   (mu4e-update-interval (* 5 60))
   (mu4e-get-mail-command "true")
+  (mu4e-modeline-support nil)
 
   :config
   (mu4e-modeline-mode -1)

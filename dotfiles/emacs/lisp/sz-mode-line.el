@@ -2,7 +2,6 @@
 
 (require 'cl-lib)
 (require 'subr-x)
-(require 'tab-bar)
 
 (setq-default mode-line-percent-position nil)
 (setq-default mode-line-position-column-line-format '("(%l,%c)"))
@@ -73,20 +72,6 @@
                             4))))
       text)))
 
-(defun sz/ewm-mode-line--tabs ()
-  "Return the current workspace's position in the frame's native tabs."
-  (when (bound-and-true-p tab-bar-mode)
-    (let* ((tabs (funcall tab-bar-tabs-function))
-           (position (cl-position 'current-tab tabs :key #'car)))
-      (when position
-        (format "Tabs %d/%d" (1+ position) (length tabs))))))
-
-(defun sz/ewm-mode-line--narrow-audio (audio)
-  "Keep AUDIO's meaningful warning on a narrow tile, if it has one."
-  (cond ((string-prefix-p "MUTED" audio) audio)
-        ((string-suffix-p " +MIC" audio) "+MIC")
-        ((string= audio "audio?") audio)))
-
 (defun sz/ewm-mode-line--desktop-status (&optional width tile-width)
   "Return in-memory EWM status for WIDTH columns on TILE-WIDTH.
 Escape literal percent signs only when embedding this text in the mode line."
@@ -96,25 +81,16 @@ Escape literal percent signs only when embedding this text in the mode line."
          ;; optional desktop state belongs on a normal-sized display.
          (tile-width (or tile-width width))
          (narrow (< tile-width 100))
-         (tabs (sz/ewm-mode-line--tabs))
          (timeblock (sz/ewm-mode-line--cached 'sz/ewm-status-timeblock))
          (audio (sz/ewm-mode-line--cached 'sz/ewm-status-audio))
          (network (sz/ewm-mode-line--cached 'sz/ewm-status-network))
          (wireguard (sz/ewm-mode-line--cached 'sz/ewm-status-wireguard))
          (layout (sz/ewm-mode-line--cached 'sz/ewm-status-layout))
          (power-saver (sz/ewm-mode-line--cached 'sz/ewm-status-power-saver))
-         (audio-warning (and audio (sz/ewm-mode-line--narrow-audio audio)))
-         (audio (if narrow audio-warning audio))
-         (fields (delq nil (list tabs audio network
+         (audio (and audio (string-prefix-p "MUTED" audio) "MUTED"))
+         (fields (delq nil (list audio network
                                  (and (not narrow) layout)
                                  (and (not narrow) power-saver)))))
-    ;; Keep the tab count and warnings whole.  Drop ordinary numeric volume
-    ;; first when space runs out, while retaining its +MIC warning.
-    (when (> (string-width (apply #'sz/ewm-mode-line--join fields)) width)
-      (setq fields (delq audio fields)
-            audio audio-warning)
-      (when audio
-        (setq fields (append fields (list audio)))))
     (dolist (field (list power-saver layout))
       (when (> (string-width (apply #'sz/ewm-mode-line--join fields)) width)
         (setq fields (delq field fields))))
@@ -133,7 +109,6 @@ Escape literal percent signs only when embedding this text in the mode line."
                                      (/ content-width 2)
                                    content-width))))
       (sz/ewm-mode-line--join
-       tabs
        (and (> (or time-width 0) 0)
             (sz/ewm-mode-line--truncate timeblock time-width))
        (and (memq audio fields) audio)
@@ -219,7 +194,7 @@ The EWM status collector owns display-time and battery lifecycle."
                (global-other (nth 0 global-parts))
                (global-org (nth 1 global-parts))
                (global-time (nth 2 global-parts))
-               ;; This is the non-negotiable floor: Tabs and whole warnings,
+               ;; This is the non-negotiable floor: whole warnings,
                ;; plus the actual battery/clock strings in the global parts.
                ;; Tiny tiles may be narrower than the floor, by design.
                (desktop-floor (and (sz/ewm-mode-line--desktop-p)
